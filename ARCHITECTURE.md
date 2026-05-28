@@ -31,6 +31,12 @@ Requests are ordered to minimise cost and latency — cheap operations first, ex
 
 All feeds are fetched concurrently (`MAX_CONCURRENT_FEEDS`, default 10) using `feedparser`. Each article's title and RSS summary are stored as-is. No full article text is fetched at this stage.
 
+Articles older than the cutoff are discarded here before anything else runs. The cutoff is the most recent of:
+- `now - MAX_ARTICLE_AGE_HOURS` (default 24h — hard cap)
+- the timestamp of the last successful run (stored in `logs/.last_run` locally, or DynamoDB when persistence is enabled)
+
+This means hourly runs only process the last hour's articles. If the pipeline hasn't run for 3 days it still caps at 24 hours.
+
 ### Step 2: LLM Classification and Filter
 
 All article titles and summaries are sent to OpenAI in a **single batch API call**. The LLM returns topic assignments (`tech`, `ai`, `cyber_security`, `education`) and discards articles that don't match any topic (general news, sport, weather etc.).
@@ -54,7 +60,7 @@ Unique articles are written to DynamoDB. Optional — controlled by `ENABLE_PERS
 
 ### Step 6: Summarisation
 
-Each new article is summarised in 2–3 sentences via OpenAI `gpt-4o-mini`. The summary is cached in DynamoDB.
+New articles are summarised concurrently (`MAX_CONCURRENT_SUMMARIZATIONS`, default 5) via OpenAI `gpt-4o-mini`. Each summary is 2–3 sentences and cached in DynamoDB.
 
 ### Step 7: Slack Digests
 
@@ -117,6 +123,9 @@ fetched_at       When this version was fetched
 | `LOG_FILE` | Write logs to file (local only) | `logs/run.log` |
 | `MAX_ARTICLES_PER_FEED` | Articles fetched per feed per run | `50` |
 | `MAX_CONCURRENT_FEEDS` | Parallel feed/article fetches | `10` |
+| `MAX_CONCURRENT_SUMMARIZATIONS` | Parallel OpenAI summarisation calls | `5` |
+| `MAX_ARTICLE_AGE_HOURS` | Discard articles older than this (0 = disabled) | `24` |
+| `LAST_RUN_FILE` | Path to last run timestamp file | `logs/.last_run` |
 
 ## RSS Feed Configuration
 
