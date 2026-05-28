@@ -139,3 +139,22 @@ def test_llm_classifier_handles_empty_input(mock_openai):
     result = classifier.classify_and_filter([])
     assert result == []
     mock_openai.chat.completions.create.assert_not_called()
+
+
+def test_llm_classifier_chunks_large_batches(mock_openai):
+    import json
+    from app.src.classification import CLASSIFICATION_BATCH_SIZE
+
+    mock_openai.chat.completions.create.return_value.choices[0].message.content = json.dumps(
+        {"1": ["tech"]}
+    )
+
+    articles = [
+        make_article(f"Article {i}", url=f"https://example.com/{i}")
+        for i in range(CLASSIFICATION_BATCH_SIZE + 1)
+    ]
+    classifier = LLMClassifier(api_key="test-key")
+    classifier.classify_and_filter(articles)
+
+    # Should have made 2 API calls for BATCH_SIZE+1 articles
+    assert mock_openai.chat.completions.create.call_count == 2

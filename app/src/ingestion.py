@@ -5,7 +5,7 @@ import logging
 import socket
 import feedparser
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 from urllib.parse import urlparse
 import yaml
@@ -43,10 +43,17 @@ class RSSIngester:
         max_articles_per_feed: int = 50,
         timeout: int = 10,
         max_concurrent_feeds: int = 10,
+        max_age_hours: int = 24,
     ):
         self.max_articles_per_feed = max_articles_per_feed
         self.timeout = timeout
         self.max_concurrent_feeds = max_concurrent_feeds
+        # Cutoff is fixed at init time so all feeds use the same window
+        self.cutoff = (
+            datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+            if max_age_hours > 0
+            else None
+        )
 
     def ingest_feed(self, feed_url: str) -> Tuple[List[Article], int]:
         articles = []
@@ -111,8 +118,7 @@ class RSSIngester:
 
         return all_articles, stats
 
-    @staticmethod
-    def _parse_entry(entry: dict, feed_url: str) -> Optional[Article]:
+    def _parse_entry(self, entry: dict, feed_url: str) -> Optional[Article]:
         """Parse a feed entry — stores RSS title and summary only, no HTTP fetching."""
         try:
             title = entry.get("title", "").strip()
@@ -123,8 +129,20 @@ class RSSIngester:
             if not url:
                 return None
 
-            published_at = RSSIngester._parse_date(entry)
-            content = RSSIngester._extract_rss_content(entry)
+            published_at = self._parse_date(entry)
+
+            if self.cutoff:
+                # Make published_at timezone-aware for comparison
+                pub_aware = (
+                    published_at.replace(tzinfo=timezone.utc)
+                    if published_at.tzinfo is None
+                    else published_at
+                )
+                if pub_aware < self.cutoff:
+                    logger.debug(f"Skipping old article ({published_at}): {title}")
+                    return None
+
+            content = self._extract_rss_content(entry)
             source = urlparse(feed_url).netloc
 
             return Article(

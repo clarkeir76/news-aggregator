@@ -54,6 +54,54 @@ def test_parse_date_falls_back_to_utcnow():
     assert before <= date <= after
 
 
+def test_age_filter_rejects_old_articles(mocker):
+    mock_feed = MagicMock()
+    mock_feed.bozo = False
+    mock_feed.entries = [{
+        "title": "Old Article",
+        "link": "https://example.com/old",
+        "summary": "Old news",
+        "published_parsed": (2020, 1, 1, 0, 0, 0, 0, 0, 0),
+    }]
+    mocker.patch("app.src.ingestion.feedparser.parse", return_value=mock_feed)
+
+    ingester = RSSIngester(max_age_hours=24)
+    articles, _ = ingester.ingest_feed("https://example.com/rss")
+    assert len(articles) == 0
+
+
+def test_age_filter_accepts_recent_articles(mocker):
+    mock_feed = MagicMock()
+    mock_feed.bozo = False
+    mock_feed.entries = [{
+        "title": "Fresh Article",
+        "link": "https://example.com/fresh",
+        "summary": "A" * 50,
+        "published_parsed": (2099, 1, 1, 0, 0, 0, 0, 0, 0),
+    }]
+    mocker.patch("app.src.ingestion.feedparser.parse", return_value=mock_feed)
+
+    ingester = RSSIngester(max_age_hours=24)
+    articles, _ = ingester.ingest_feed("https://example.com/rss")
+    assert len(articles) == 1
+
+
+def test_age_filter_disabled_when_zero(mocker):
+    mock_feed = MagicMock()
+    mock_feed.bozo = False
+    mock_feed.entries = [{
+        "title": "Old Article",
+        "link": "https://example.com/old",
+        "summary": "Old news",
+        "published_parsed": (2020, 1, 1, 0, 0, 0, 0, 0, 0),
+    }]
+    mocker.patch("app.src.ingestion.feedparser.parse", return_value=mock_feed)
+
+    ingester = RSSIngester(max_age_hours=0)  # 0 = no filter
+    articles, _ = ingester.ingest_feed("https://example.com/rss")
+    assert len(articles) == 1
+
+
 # --- RSSIngester._extract_rss_content ---
 
 def test_extract_rss_content_prefers_content_over_summary():
@@ -86,7 +134,7 @@ def test_ingest_feed_returns_articles(mocker):
     }]
     mocker.patch("app.src.ingestion.feedparser.parse", return_value=mock_feed)
 
-    ingester = RSSIngester()
+    ingester = RSSIngester(max_age_hours=0)  # disable age filter for this test
     articles, errors = ingester.ingest_feed("https://example.com/rss")
 
     assert len(articles) == 1
@@ -126,7 +174,7 @@ def test_ingest_feed_skips_entries_without_title(mocker):
     ]
     mocker.patch("app.src.ingestion.feedparser.parse", return_value=mock_feed)
 
-    ingester = RSSIngester()
+    ingester = RSSIngester(max_age_hours=0)
     articles, errors = ingester.ingest_feed("https://example.com/rss")
 
     assert len(articles) == 1
@@ -137,7 +185,7 @@ def test_ingest_feed_skips_entries_without_title(mocker):
 
 def test_ingest_feeds_aggregates_stats(mocker):
     # max_concurrent_feeds=1 keeps execution sequential so side_effect order is deterministic
-    ingester = RSSIngester(max_concurrent_feeds=1)
+    ingester = RSSIngester(max_concurrent_feeds=1, max_age_hours=0)
     mocker.patch.object(ingester, "ingest_feed", side_effect=[
         ([MagicMock(), MagicMock()], 0),
         ([MagicMock()], 1),

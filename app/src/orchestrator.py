@@ -21,13 +21,12 @@ class NewsAggregator:
     """
     News aggregation pipeline.
 
-    Order of operations:
-      1. Ingest RSS feeds (title + RSS summary only — fast, no article fetching)
-      2. Classify and filter (LLM batch call — discard irrelevant articles)
-      3. Fetch full article text (only for matched articles — concurrent)
-      4. Deduplicate
+      1. Ingest RSS feeds (title + RSS summary only — concurrent)
+      2. Classify and filter (LLM batch — discard irrelevant articles)
+      3. Fetch full article text (matched articles only — concurrent)
+      4. Deduplicate against existing articles
       5. Persist to DynamoDB (optional)
-      6. Summarise via OpenAI
+      6. Summarise via OpenAI (concurrent)
       7. Post Slack digests
     """
 
@@ -46,12 +45,17 @@ class NewsAggregator:
         enable_llm_classification: bool = True,
         max_articles_per_feed: int = 50,
         max_concurrent_feeds: int = 10,
+        max_concurrent_summarizations: int = 5,
+        max_article_age_hours: int = 24,
     ):
         self.feed_config_path = feed_config_path
+        self.max_concurrent_feeds = max_concurrent_feeds
+        self.max_concurrent_summarizations = max_concurrent_summarizations
 
         self.ingester = RSSIngester(
             max_articles_per_feed=max_articles_per_feed,
             max_concurrent_feeds=max_concurrent_feeds,
+            max_age_hours=max_article_age_hours,
         )
 
         self.classifier = (
@@ -61,8 +65,6 @@ class NewsAggregator:
         )
 
         self.content_extractor = ContentExtractor()
-        self.max_concurrent_feeds = max_concurrent_feeds
-
         self.deduplicator = Deduplicator()
 
         self.store = None
@@ -81,7 +83,17 @@ class NewsAggregator:
         if enable_slack and slack_webhooks:
             self.notifier = SlackNotifier(webhook_urls=slack_webhooks, dry_run=slack_dry_run)
 
-        self.stats = {}
+        self.stats = {
+            "timestamp": "",
+            "feeds_processed": 0,
+            "articles_ingested": 0,
+            "articles_classified": 0,
+            "articles_deduplicated": 0,
+            "articles_saved": 0,
+            "articles_summarized": 0,
+            "articles_notified": 0,
+            "errors": [],
+        }
 
     def run(self) -> dict:
         logger.info("Starting news aggregation pipeline")
@@ -98,33 +110,32 @@ class NewsAggregator:
         }
 
         try:
-            # Step 1: Load feed configuration
             feed_configs = FeedConfig.load_from_yaml(self.feed_config_path)
             if not feed_configs:
                 raise RuntimeError("No feeds loaded from configuration")
             self.stats["feeds_loaded"] = len(feed_configs)
 
-            # Step 2: Ingest RSS feeds (title + summary only, concurrent)
+            # Step 1: Ingest (title + RSS summary, concurrent)
             articles, ingest_stats = self.ingester.ingest_feeds(feed_configs)
             self.stats.update(ingest_stats)
             self.stats["articles_ingested"] = len(articles)
             logger.info(f"Ingested {len(articles)} articles from {len(feed_configs)} feeds")
 
-            # Step 3: Classify and filter — discard articles outside our topics
+            # Step 2: Classify and filter
             articles = self.classifier.classify_and_filter(articles)
             self.stats["articles_classified"] = len(articles)
             logger.info(f"{len(articles)} articles matched our topics")
 
-            # Step 4: Fetch full article text (only for matched articles, concurrent)
+            # Step 3: Fetch full article text (matched articles only, concurrent)
             articles = self._enrich_content(articles)
 
-            # Step 5: Deduplicate
+            # Step 4: Deduplicate
             existing_articles = self.store.get_recent_articles(limit=1000) if self.store else []
             logger.info(f"Retrieved {len(existing_articles)} existing articles for deduplication")
             unique_articles, dedup_stats = self.deduplicator.deduplicate(articles, existing_articles)
             self.stats.update(dedup_stats)
 
-            # Step 6: Persist
+            # Step 5: Persist
             new_articles = []
             for article in unique_articles:
                 if self.store:
@@ -135,18 +146,10 @@ class NewsAggregator:
                 else:
                     new_articles.append((article, None))
 
-            # Step 7: Summarise
-            summaries = {}
-            if self.summarizer and new_articles:
-                for article, article_id in new_articles:
-                    summary = self.summarizer.summarize(article.content, article.title)
-                    if summary:
-                        summaries[article.url] = summary
-                        if self.store and article_id:
-                            self.store.update_article(article_id, {"last_summary": summary})
-                        self.stats["articles_summarized"] += 1
+            # Step 6: Summarise (concurrent)
+            summaries = self._summarise(new_articles)
 
-            # Step 8: Notify
+            # Step 7: Notify
             if self.notifier and new_articles:
                 articles_to_notify = [article for article, _ in new_articles]
                 if self.notifier.notify_digest(articles_to_notify, summaries):
@@ -181,3 +184,33 @@ class NewsAggregator:
 
         logger.info(f"Enriched content for {len(enriched)} articles")
         return enriched
+
+    def _summarise(self, new_articles: list) -> dict:
+        """Summarise new articles concurrently. Returns dict of url -> summary."""
+        if not self.summarizer or not new_articles:
+            return {}
+
+        def summarise_one(pair):
+            article, article_id = pair
+            summary = self.summarizer.summarize(article.content, article.title)
+            if summary and self.store and article_id:
+                self.store.update_article(article_id, {"last_summary": summary})
+            return article.url, summary
+
+        summaries = {}
+        results = []
+        with ThreadPoolExecutor(max_workers=self.max_concurrent_summarizations) as executor:
+            futures = {executor.submit(summarise_one, pair): pair for pair in new_articles}
+            for future in as_completed(futures):
+                try:
+                    results.append(future.result())
+                except Exception as e:
+                    article, _ = futures[future]
+                    logger.warning(f"Summarisation failed for {article.url}: {e}")
+
+        for url, summary in results:
+            if summary:
+                summaries[url] = summary
+                self.stats["articles_summarized"] += 1
+
+        return summaries

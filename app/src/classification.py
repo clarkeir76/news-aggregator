@@ -10,6 +10,8 @@ from .models import Article, Topic
 
 logger = logging.getLogger(__name__)
 
+CLASSIFICATION_BATCH_SIZE = 50
+
 TOPICS = {
     Topic.AI.value: "artificial intelligence, machine learning, LLMs, generative AI, AI research, AI products and companies",
     Topic.TECH.value: "technology, software, startups, programming, cloud, hardware, developer tools (not specifically AI)",
@@ -56,9 +58,21 @@ class LLMClassifier:
 
     def _classify_batch(self, articles: List[Article]) -> dict:
         """
-        Send all articles to the LLM in one call.
+        Classify articles in chunks, merge results.
         Returns dict mapping article URL -> list of matched topics.
         """
+        all_results = {}
+        chunks = [
+            articles[i:i + CLASSIFICATION_BATCH_SIZE]
+            for i in range(0, len(articles), CLASSIFICATION_BATCH_SIZE)
+        ]
+        logger.info(f"Classifying {len(articles)} articles in {len(chunks)} batch(es)")
+        for chunk in chunks:
+            all_results.update(self._classify_chunk(chunk))
+        return all_results
+
+    def _classify_chunk(self, articles: List[Article]) -> dict:
+        """Send one chunk of articles to the LLM. Returns url -> topics dict."""
         indexed = {str(i + 1): article for i, article in enumerate(articles)}
 
         topic_descriptions = "\n".join(

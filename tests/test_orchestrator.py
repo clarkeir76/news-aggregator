@@ -146,3 +146,37 @@ def test_enrich_content_handles_fetch_failure(mocker, feed_config_file, article)
 
     assert len(result) == 1
     assert result[0].url == article.url
+
+
+def test_summarise_runs_concurrently(mocker, feed_config_file, article):
+    from unittest.mock import MagicMock
+    mocker.patch("app.src.summarization.openai.OpenAI", return_value=MagicMock())
+    agg = make_aggregator(
+        feed_config_file,
+        enable_summarization=True,
+        openai_api_key="test-key",
+        max_concurrent_summarizations=3,
+    )
+    mocker.patch.object(agg.summarizer, "summarize", return_value="A summary.")
+
+    summaries = agg._summarise([(article, None)])
+
+    assert article.url in summaries
+    assert summaries[article.url] == "A summary."
+    assert agg.stats["articles_summarized"] == 1
+
+
+def test_summarise_handles_failure_gracefully(mocker, feed_config_file, article):
+    from unittest.mock import MagicMock
+    mocker.patch("app.src.summarization.openai.OpenAI", return_value=MagicMock())
+    agg = make_aggregator(
+        feed_config_file,
+        enable_summarization=True,
+        openai_api_key="test-key",
+    )
+    mocker.patch.object(agg.summarizer, "summarize", side_effect=Exception("API error"))
+
+    summaries = agg._summarise([(article, None)])
+
+    assert summaries == {}
+    assert agg.stats["articles_summarized"] == 0
