@@ -68,7 +68,9 @@ class LLMClassifier:
             articles[i : i + CLASSIFICATION_BATCH_SIZE]
             for i in range(0, len(articles), CLASSIFICATION_BATCH_SIZE)
         ]
-        logger.info(f"Classifying {len(articles)} articles in {len(chunks)} batch(es)")  # noqa: E501
+        logger.info(
+            f"Classifying {len(articles)} articles in {len(chunks)} batch(es)"
+        )  # noqa: E501
         for chunk in chunks:
             all_results.update(self._classify_chunk(chunk))
         return all_results
