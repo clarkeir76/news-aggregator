@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // empty' | grep -q '\\.py$' && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"You just edited a .py file. Check before committing: do README.md, ARCHITECTURE.md, DEPLOYMENT.md, DESIGN_DECISIONS.md, API.md, or any tests need updating?\"}}' || true"
+          }
+        ]
+      }
+    ]
+  }
+}
