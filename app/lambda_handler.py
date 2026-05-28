@@ -50,6 +50,7 @@ def lambda_handler(event, context):
             slack_webhooks=slack_webhooks,
             enable_summarization=config.enable_summarization,
             enable_slack=config.enable_slack,
+            slack_dry_run=config.slack_dry_run,
             enable_persistence=config.enable_persistence,
             max_articles_per_feed=config.max_articles_per_feed,
         )

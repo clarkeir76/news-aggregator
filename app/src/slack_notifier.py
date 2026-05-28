@@ -12,8 +12,9 @@ logger = logging.getLogger(__name__)
 class SlackNotifier:
     """Send digest messages to Slack via webhooks"""
 
-    def __init__(self, webhook_urls: dict):
+    def __init__(self, webhook_urls: dict, dry_run: bool = False):
         self.webhook_urls = webhook_urls
+        self.dry_run = dry_run
 
     def notify_digest(self, articles: List[Article], summaries: dict = None) -> bool:
         """
@@ -41,7 +42,9 @@ class SlackNotifier:
         success = True
         for topic, topic_articles in by_topic.items():
             message = self._build_digest(topic, topic_articles, summaries)
-            if not self._send_webhook(self.webhook_urls[topic], message):
+            if self.dry_run:
+                logger.info(f"[DRY RUN] Digest for #{topic}:\n{message['payload']}\n")
+            elif not self._send_webhook(self.webhook_urls[topic], message):
                 success = False
 
         return success

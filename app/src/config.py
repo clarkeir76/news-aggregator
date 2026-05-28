@@ -24,8 +24,10 @@ class Config:
         # Logging
         self.log_level = os.getenv("LOG_LEVEL", "INFO")
 
-        # Features
-        self.enable_slack = os.getenv("ENABLE_SLACK", "true").lower() == "true"
+        # Features — ENABLE_SLACK accepts: true | false | log (log = print digest, don't POST)
+        slack_mode = os.getenv("ENABLE_SLACK", "true").lower()
+        self.enable_slack = slack_mode in ("true", "log")
+        self.slack_dry_run = slack_mode == "log"
         self.enable_summarization = os.getenv("ENABLE_SUMMARIZATION", "true").lower() == "true"
         self.enable_persistence = os.getenv("ENABLE_PERSISTENCE", "true").lower() == "true"
 

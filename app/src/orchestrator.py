@@ -28,6 +28,7 @@ class NewsAggregator:
         slack_webhooks: dict = None,
         enable_summarization: bool = True,
         enable_slack: bool = True,
+        slack_dry_run: bool = False,
         enable_persistence: bool = True,
         max_articles_per_feed: int = 50,
     ):
@@ -51,7 +52,7 @@ class NewsAggregator:
 
         self.notifier = None
         if enable_slack and slack_webhooks:
-            self.notifier = SlackNotifier(webhook_urls=slack_webhooks)
+            self.notifier = SlackNotifier(webhook_urls=slack_webhooks, dry_run=slack_dry_run)
 
         self.stats = {}
 
