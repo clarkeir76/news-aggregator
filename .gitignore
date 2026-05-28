@@ -67,6 +67,10 @@ aws-credentials.txt
 logs/
 *.log
 
+# Runtime state
+data/
+config/.last_run
+
 # Temporary files
 *.tmp
 temp/

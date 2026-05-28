@@ -11,7 +11,7 @@ feeds:
   - url: "https://rss.dw.com/xml/rss-en-all"
   - url: "https://www.france24.com/en/rss"
   - url: "https://feeds.skynews.com/feeds/rss/home.xml"
-  - url: "https://www.cbc.ca/webfeed/rss/rss-topstories"
+  - url: "https://www.cbc.ca/webfeed/rss/rss-world"
   - url: "https://www3.nhk.or.jp/rss/news/cat0.xml"
   - url: "https://www.channelnewsasia.com/rssfeeds/8395986"
   - url: "https://www.rte.ie/feeds/rss/?index=/news/"
@@ -23,6 +23,7 @@ feeds:
   # - url: "https://apnews.com/rss"  # FAIL: 404
 
   # Tech
+  - url: "https://www.cbc.ca/webfeed/rss/rss-technology"
   - url: "https://feeds.arstechnica.com/arstechnica/index"
   - url: "https://techcrunch.com/feed/"
   - url: "https://www.theverge.com/rss/index.xml"
