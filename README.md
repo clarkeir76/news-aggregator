@@ -104,18 +104,23 @@ python app/lambda_handler.py
 
 ### Slack Webhooks
 
-This system uses **Slack Workflow Builder** webhooks (not incoming webhooks). Each topic channel needs its own webhook URL, configured in Slack Workflow Builder as a "From a webhook" trigger with a variable named `payload`.
+This system uses **Slack Incoming Webhooks** and posts messages in Block Kit format. Each topic channel needs its own webhook URL.
 
-Set the webhook URLs in `.env`:
+To create an incoming webhook:
+1. Go to **api.slack.com/apps** → your app (or create one) → **Incoming Webhooks**
+2. Enable incoming webhooks and add one per channel
+3. Copy each webhook URL
+
+Set them in `.env`:
 
 ```
-SLACK_WEBHOOK_TECH=https://hooks.slack.com/triggers/...
-SLACK_WEBHOOK_AI=https://hooks.slack.com/triggers/...
-SLACK_WEBHOOK_EDUCATION=https://hooks.slack.com/triggers/...
-SLACK_WEBHOOK_CYBER_SECURITY=https://hooks.slack.com/triggers/...
+SLACK_WEBHOOK_TECH=https://hooks.slack.com/services/...
+SLACK_WEBHOOK_AI=https://hooks.slack.com/services/...
+SLACK_WEBHOOK_EDUCATION=https://hooks.slack.com/services/...
+SLACK_WEBHOOK_CYBER_SECURITY=https://hooks.slack.com/services/...
 ```
 
-Omitting a variable for a topic simply means that topic won't send notifications.
+Omitting a variable for a topic means that topic won't send notifications.
 
 ### RSS Feeds
 

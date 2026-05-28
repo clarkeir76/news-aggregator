@@ -66,11 +66,11 @@ Key decisions and the reasoning behind them.
 
 ---
 
-## Slack Workflow Builder webhooks
+## Slack Incoming Webhooks with Block Kit
 
-**Decision**: Use Slack Workflow Builder trigger URLs rather than traditional incoming webhooks.
+**Decision**: Use Slack Incoming Webhooks and post messages in Block Kit format.
 
-**Why**: Workflow Builder gives more control over how messages appear in channels without requiring a custom Slack app. The tradeoff is that the payload must be a flat JSON object with named variables — no attachments or blocks. The digest is pre-formatted as a single `payload` string using Slack's mrkdwn syntax (e.g. `*bold*`, `<url|title>`).
+**Why**: Block Kit is Slack's structured message format — it renders mrkdwn correctly (bold, links, emoji) and gives control over layout. Incoming Webhooks accept Block Kit JSON directly, unlike Workflow Builder triggers which treat payload content as plain text. `unfurl_links` and `unfurl_media` are disabled to keep digests compact.
 
 **One digest per topic per run**: Rather than posting one message per article, all matched articles for a topic are bundled into a single message per run. This prevents channel flooding and gives readers a clear "here's what happened" snapshot.
 

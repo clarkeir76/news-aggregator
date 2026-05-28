@@ -12,23 +12,21 @@
 
 ## Step 1: Slack Setup
 
-This system uses **Slack Workflow Builder** webhooks — not traditional incoming webhooks.
+This system uses **Slack Incoming Webhooks** and posts Block Kit formatted messages.
 
 For each topic channel (`#tech`, `#ai`, `#education`, `#cyber-security`):
 
-1. Open the channel in Slack → click the channel name → **Integrations** → **Add a Workflow**
-2. Create a new workflow → choose **"From a webhook"** as the trigger
-3. In "Set up variables", add one variable named `payload` (type: text)
-4. Add a **Send a message** step that uses the `payload` variable as the message body
-5. Publish the workflow
-6. Copy the webhook trigger URL
+1. Go to **api.slack.com/apps** → create or select your app
+2. Navigate to **Incoming Webhooks** → toggle on → **Add New Webhook to Workspace**
+3. Select the target channel and authorise
+4. Copy the webhook URL
 
 You'll end up with four URLs:
 ```
-SLACK_WEBHOOK_TECH=https://hooks.slack.com/triggers/...
-SLACK_WEBHOOK_AI=https://hooks.slack.com/triggers/...
-SLACK_WEBHOOK_EDUCATION=https://hooks.slack.com/triggers/...
-SLACK_WEBHOOK_CYBER_SECURITY=https://hooks.slack.com/triggers/...
+SLACK_WEBHOOK_TECH=https://hooks.slack.com/services/...
+SLACK_WEBHOOK_AI=https://hooks.slack.com/services/...
+SLACK_WEBHOOK_EDUCATION=https://hooks.slack.com/services/...
+SLACK_WEBHOOK_CYBER_SECURITY=https://hooks.slack.com/services/...
 ```
 
 ---
@@ -179,9 +177,8 @@ aws dynamodb scan --table-name news-articles --max-items 5
 - Check logs for `LLM classification failed`
 
 **Slack messages not arriving**
-- Verify the webhook URL is a Workflow Builder trigger URL (`hooks.slack.com/triggers/...`)
-- Check the workflow is **published** in Slack (not just saved as draft)
-- Confirm the workflow has a variable named exactly `payload`
+- Verify the webhook URL is an Incoming Webhook URL (`hooks.slack.com/services/...`)
+- Check the webhook is still active in **api.slack.com/apps** → your app → Incoming Webhooks
 - Check logs for `Slack webhook returned`
 
 **Lambda timeout**
