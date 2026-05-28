@@ -53,19 +53,19 @@ def test_classify_education_article(classifier):
     assert "education" in topics
 
 
-def test_classify_preserves_feed_topics(classifier):
-    """Test that topics from feed config are preserved"""
+def test_classify_always_runs_regardless_of_preset_topics(classifier):
+    """Classification always runs on content — pre-set topics are ignored"""
     article = Article(
-        title="Generic Article",
+        title="Major Security Breach Exposes Millions",
         source="example.com",
         url="https://example.com",
         published_at=datetime.utcnow(),
-        content="Some content",
-        topics=["ai", "tech"],  # Topics from feed config
+        content="A critical vulnerability allowed hackers to breach encrypted systems",
+        topics=["tech"],  # pre-set topic that doesn't match content
     )
 
     topics = classifier.classify(article)
-    assert topics == ["ai", "tech"]
+    assert "cyber_security" in topics
 
 
 def test_classify_default_to_tech(classifier):

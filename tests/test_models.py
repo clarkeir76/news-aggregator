@@ -72,8 +72,8 @@ def test_article_to_dict_iso_format():
     )
 
     data = article.to_dict()
-    assert "2024-01-15" in data["published_at"]
-    assert "2024-01-15" in data["fetched_at"]
+    assert data["published_at"] == "2024-01-15T10:30:45"
+    assert isinstance(data["fetched_at"], str)  # utcnow() — just verify it serialised
 
 
 def test_topic_enum():

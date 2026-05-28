@@ -59,21 +59,21 @@ def test_deduplicate_content_hash_match(deduplicator):
 
 
 def test_deduplicate_fuzzy_title_match(deduplicator):
-    """Test fuzzy title deduplication"""
+    """Test fuzzy title deduplication — titles must score >=85 on fuzz.ratio"""
     article1 = Article(
-        title="New AI Model Released",
-        source="openai.com",
-        url="https://openai.com/article1",
+        title="Apple Releases New iPhone",
+        source="techcrunch.com",
+        url="https://techcrunch.com/article1",
         published_at=datetime.utcnow(),
-        content="Content about new AI model",
+        content="Apple content 1",
     )
 
     article2 = Article(
-        title="OpenAI Releases New AI Model",
-        source="openai.com",
-        url="https://openai.com/article2",
+        title="Apple Releases New iPhone Model",
+        source="techcrunch.com",
+        url="https://techcrunch.com/article2",
         published_at=datetime.utcnow(),
-        content="Different content about new AI model",
+        content="Apple content 2",
     )
 
     unique, stats = deduplicator.deduplicate([article1, article2])

@@ -101,7 +101,7 @@ jobs:
           mkdir -p lambda_build
           pip install -r requirements.txt -t lambda_build/
           cp -r app lambda_build/
-          cp config/feeds.yaml lambda_build/
+          cp -r config lambda_build/
           cd lambda_build
           zip -r ../lambda_function.zip .
       
@@ -142,23 +142,25 @@ jobs:
           terraform init
       
       - name: Terraform Plan (Dev)
+        id: plan
         run: |
           cd infra/terraform
-          terraform plan -var-file=terraform.dev.tfvars -out=tfplan_dev
+          terraform plan -var-file=terraform.dev.tfvars -out=tfplan_dev -no-color 2>&1 | tee tfplan_dev.txt
         continue-on-error: true
-      
+
       - name: Comment PR with plan
         uses: actions/github-script@v6
         if: github.event_name == 'pull_request'
         with:
           script: |
             const fs = require('fs');
-            const plan = fs.readFileSync('infra/terraform/tfplan_dev', 'utf8');
+            const plan = fs.readFileSync('infra/terraform/tfplan_dev.txt', 'utf8');
+            const truncated = plan.length > 60000 ? plan.slice(0, 60000) + '\n... (truncated)' : plan;
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `## Terraform Plan\n\`\`\`\n${plan}\n\`\`\``
+              body: `## Terraform Plan\n\`\`\`\n${truncated}\n\`\`\``
             });
 
   deploy-infrastructure:

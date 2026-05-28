@@ -21,21 +21,29 @@ class NewsAggregator:
     def __init__(
         self,
         feed_config_path: str,
-        dynamodb_table: str,
+        dynamodb_table: str = None,
         aws_region: str = "us-east-1",
+        aws_endpoint_url: str = None,
         openai_api_key: str = None,
         slack_webhooks: dict = None,
         enable_summarization: bool = True,
         enable_slack: bool = True,
+        enable_persistence: bool = True,
         max_articles_per_feed: int = 50,
     ):
         self.feed_config_path = feed_config_path
 
-        # Initialize components
         self.ingester = RSSIngester(max_articles_per_feed=max_articles_per_feed)
         self.classifier = KeywordClassifier()
         self.deduplicator = Deduplicator()
-        self.store = DynamoDBStore(table_name=dynamodb_table, region_name=aws_region)
+
+        self.store = None
+        if enable_persistence and dynamodb_table:
+            self.store = DynamoDBStore(
+                table_name=dynamodb_table,
+                region_name=aws_region,
+                endpoint_url=aws_endpoint_url,
+            )
 
         self.summarizer = None
         if enable_summarization and openai_api_key:
@@ -84,8 +92,8 @@ class NewsAggregator:
             articles = self.classifier.classify_articles(articles)
             self.stats["articles_classified"] = len(articles)
 
-            # Step 4: Get existing articles for deduplication
-            existing_articles = self.store.get_recent_articles(limit=1000)
+            # Step 4: Get existing articles for deduplication (skipped if no store)
+            existing_articles = self.store.get_recent_articles(limit=1000) if self.store else []
             logger.info(f"Retrieved {len(existing_articles)} existing articles for deduplication")
 
             # Step 5: Deduplicate
@@ -94,13 +102,16 @@ class NewsAggregator:
             )
             self.stats.update(dedup_stats)
 
-            # Step 6: Process and store articles
+            # Step 6: Store articles (skipped if no store)
             new_articles = []
             for article in unique_articles:
-                article_id = self.store.save_article(article)
-                if article_id:
-                    self.stats["articles_saved"] += 1
-                    new_articles.append((article, article_id))
+                if self.store:
+                    article_id = self.store.save_article(article)
+                    if article_id:
+                        self.stats["articles_saved"] += 1
+                        new_articles.append((article, article_id))
+                else:
+                    new_articles.append((article, None))
 
             # Step 7: Summarize articles
             summaries = {}
@@ -109,15 +120,14 @@ class NewsAggregator:
                     summary = self.summarizer.summarize(article.content, article.title)
                     if summary:
                         summaries[article.url] = summary
-                        self.store.update_article(
-                            article_id, {"last_summary": summary}
-                        )
+                        if self.store and article_id:
+                            self.store.update_article(article_id, {"last_summary": summary})
                         self.stats["articles_summarized"] += 1
 
-            # Step 8: Send notifications
+            # Step 8: Send digest notifications (one message per topic channel)
             if self.notifier and new_articles:
                 articles_to_notify = [article for article, _ in new_articles]
-                if self.notifier.notify_batch(articles_to_notify, summaries):
+                if self.notifier.notify_digest(articles_to_notify, summaries):
                     self.stats["articles_notified"] = len(articles_to_notify)
 
         except Exception as e:

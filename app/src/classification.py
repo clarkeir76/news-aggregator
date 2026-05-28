@@ -1,7 +1,8 @@
 """Topic classification module"""
 
 import logging
-from typing import List, Set
+import re
+from typing import List
 from .models import Article, Topic
 
 logger = logging.getLogger(__name__)
@@ -83,16 +84,12 @@ class KeywordClassifier:
         Returns:
             List of matched topics
         """
-        if article.topics:
-            # If topics already provided (from feed config), use them
-            return article.topics
-
         text = f"{article.title} {article.content}".lower()
         matched_topics = []
 
         for topic, keywords in self.keywords.items():
             for keyword in keywords:
-                if keyword.lower() in text:
+                if re.search(r'\b' + re.escape(keyword.lower()) + r'\b', text):
                     matched_topics.append(topic)
                     break  # Match topic once per article
 

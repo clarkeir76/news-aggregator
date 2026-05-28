@@ -15,13 +15,11 @@ class Config:
         # AWS Configuration
         self.aws_region = os.getenv("AWS_REGION", "us-east-1")
         self.dynamodb_table = os.getenv("DYNAMODB_TABLE", "news-articles")
+        self.aws_endpoint_url = os.getenv("AWS_ENDPOINT_URL")  # set to http://localhost:4566 for LocalStack
 
         # OpenAI Configuration
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
         self.openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-
-        # Slack Configuration
-        self.slack_webhook_base = os.getenv("SLACK_WEBHOOK_BASE", "")
 
         # Logging
         self.log_level = os.getenv("LOG_LEVEL", "INFO")
@@ -29,6 +27,7 @@ class Config:
         # Features
         self.enable_slack = os.getenv("ENABLE_SLACK", "true").lower() == "true"
         self.enable_summarization = os.getenv("ENABLE_SUMMARIZATION", "true").lower() == "true"
+        self.enable_persistence = os.getenv("ENABLE_PERSISTENCE", "true").lower() == "true"
 
         # Limits
         self.max_articles_per_feed = int(os.getenv("MAX_ARTICLES_PER_FEED", "50"))

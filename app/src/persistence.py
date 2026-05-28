@@ -15,9 +15,9 @@ logger = logging.getLogger(__name__)
 class DynamoDBStore:
     """DynamoDB persistence for articles"""
 
-    def __init__(self, table_name: str, region_name: str = "us-east-1"):
+    def __init__(self, table_name: str, region_name: str = "us-east-1", endpoint_url: str = None):
         self.table_name = table_name
-        self.dynamodb = boto3.resource("dynamodb", region_name=region_name)
+        self.dynamodb = boto3.resource("dynamodb", region_name=region_name, endpoint_url=endpoint_url)
         self.table = self.dynamodb.Table(table_name)
 
     def save_article(self, article: Article) -> Optional[str]:
@@ -35,7 +35,7 @@ class DynamoDBStore:
 
             # Add partition and sort keys
             item["pk"] = f"ARTICLE#{article_id}"
-            item["sk"] = f"METADATA#{stored_article.first_seen_at.isoformat()}"
+            item["sk"] = "METADATA"
 
             # Add GSI keys for querying
             item["url_gsi_pk"] = f"URL#{article.url}"
@@ -54,7 +54,7 @@ class DynamoDBStore:
         """Retrieve article by ID"""
         try:
             response = self.table.get_item(
-                Key={"pk": f"ARTICLE#{article_id}", "sk": f"METADATA#"}
+                Key={"pk": f"ARTICLE#{article_id}", "sk": "METADATA"}
             )
 
             if "Item" in response:
@@ -132,7 +132,7 @@ class DynamoDBStore:
             expression = "SET " + ", ".join(update_parts)
 
             self.table.update_item(
-                Key={"pk": f"ARTICLE#{article_id}", "sk": f"METADATA#"},
+                Key={"pk": f"ARTICLE#{article_id}", "sk": "METADATA"},
                 UpdateExpression=expression,
                 ExpressionAttributeValues=expression_values,
             )
@@ -148,7 +148,6 @@ class DynamoDBStore:
         try:
             response = self.table.scan(
                 Limit=limit,
-                ScanIndexForward=False,
             )
 
             return [StoredArticle.from_dict(item) for item in response.get("Items", [])]

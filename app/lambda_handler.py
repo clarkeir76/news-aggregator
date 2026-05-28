@@ -3,6 +3,10 @@
 import os
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env when running locally (no-op in Lambda where env vars are set directly)
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 # Add src directory to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -32,14 +36,21 @@ def lambda_handler(event, context):
         slack_webhooks = _load_slack_webhooks()
 
         # Initialize aggregator
+        feed_config_path = os.getenv(
+            "FEED_CONFIG_PATH",
+            str(Path(__file__).parent.parent / "config" / "feeds.yaml"),
+        )
+
         aggregator = NewsAggregator(
-            feed_config_path="/opt/config/feeds.yaml",
+            feed_config_path=feed_config_path,
             dynamodb_table=config.dynamodb_table,
             aws_region=config.aws_region,
+            aws_endpoint_url=config.aws_endpoint_url,
             openai_api_key=config.openai_api_key,
             slack_webhooks=slack_webhooks,
             enable_summarization=config.enable_summarization,
             enable_slack=config.enable_slack,
+            enable_persistence=config.enable_persistence,
             max_articles_per_feed=config.max_articles_per_feed,
         )
 

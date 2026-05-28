@@ -1,41 +1,78 @@
-# News feeds configuration
-# Format: URL: topic (can be multiple topics as a list)
+# News feeds — topics are determined automatically by the classifier
+# Feeds marked FAIL were unreachable or returned no content as of 2026-05-28
 
 feeds:
-  # Tech
-  - url: "https://news.ycombinator.com/rss"
-    topics: ["tech"]
-  
-  - url: "https://feeds.arstechnica.com/arstechnica/index"
-    topics: ["tech"]
-  
-  - url: "https://feeds.techcrunch.com/techcrunch/"
-    topics: ["tech"]
-  
-  # AI
-  - url: "https://feeds.bloomberg.com/markets/news.rss"
-    topics: ["tech", "ai"]
-  
-  - url: "https://arxiv.org/list/cs.AI/rss"
-    topics: ["ai"]
-  
-  # Cyber Security
-  - url: "https://feeds.bleepingcomputer.com/feed/"
-    topics: ["cyber_security", "tech"]
-  
-  - url: "https://www.darkreading.com/rss.xml"
-    topics: ["cyber_security"]
-  
-  # Education
-  - url: "https://feeds.edweek.org/education-week/"
-    topics: ["education"]
-  
-  - url: "https://www.edsurge.com/feed"
-    topics: ["education", "tech"]
 
-# Slack webhooks configuration
-slack_webhooks:
-  tech: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
-  education: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
-  ai: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
-  cyber_security: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+  # General news
+  - url: "https://feeds.bbci.co.uk/news/rss.xml"
+  - url: "https://www.theguardian.com/world/rss"
+  - url: "https://feeds.npr.org/1001/rss.xml"
+  - url: "https://www.aljazeera.com/xml/rss/all.xml"
+  - url: "https://rss.dw.com/xml/rss-en-all"
+  - url: "https://www.france24.com/en/rss"
+  - url: "https://feeds.skynews.com/feeds/rss/home.xml"
+  - url: "https://www.cbc.ca/webfeed/rss/rss-topstories"
+  - url: "https://www3.nhk.or.jp/rss/news/cat0.xml"
+  - url: "https://www.channelnewsasia.com/rssfeeds/8395986"
+  - url: "https://www.rte.ie/feeds/rss/?index=/news/"
+  - url: "https://www.sbs.com.au/news/feed"
+  - url: "https://www.abc.net.au/news/feed/51120/rss.xml"
+  - url: "https://www.pbs.org/newshour/feeds/rss/headlines"
+  - url: "https://www.cbsnews.com/latest/rss/main"
+  # - url: "https://www.reutersagency.com/feed/?best-topics=all&post_type=best"  # FAIL: 404
+  # - url: "https://apnews.com/rss"  # FAIL: 404
+
+  # Tech
+  - url: "https://feeds.arstechnica.com/arstechnica/index"
+  - url: "https://techcrunch.com/feed/"
+  - url: "https://www.theverge.com/rss/index.xml"
+  - url: "https://venturebeat.com/feed/"
+  - url: "https://news.ycombinator.com/rss"
+  - url: "https://rss.slashdot.org/Slashdot/slashdotMain"
+  - url: "https://www.theregister.com/headlines.atom"
+  - url: "https://www.wired.com/feed/rss"
+  - url: "https://www.infoq.com/feed/"
+  - url: "https://www.zdnet.com/topic/artificial-intelligence/rss.xml"
+  # - url: "https://spectrum.ieee.org/feed"  # FAIL: parse error, no entries
+  # - url: "https://feeds.feedburner.com/oreilly/radar"  # FAIL: 404
+
+  # AI
+  - url: "https://www.technologyreview.com/feed/"
+  - url: "https://openai.com/news/rss.xml"
+  - url: "https://blog.google/technology/ai/rss/"
+  - url: "https://huggingface.co/blog/feed.xml"
+  - url: "https://www.infoq.com/feed/ai-ml-data-eng/"
+  - url: "https://rss.arxiv.org/rss/cs.AI"
+  - url: "https://blogs.nvidia.com/feed/"
+  # - url: "https://www.anthropic.com/news/rss.xml"  # FAIL: 404
+  # - url: "https://deepmind.google/discover/blog/rss.xml"  # FAIL: 404
+  # - url: "https://stability.ai/feed"  # FAIL: 404
+  # - url: "https://www.infoworld.com/category/artificial-intelligence/index.rss"  # FAIL: parse error
+  # - url: "https://machinelearning.apple.com/rss.xml"  # FAIL: 403
+
+  # Cyber security
+  - url: "https://krebsonsecurity.com/feed/"
+  - url: "https://www.bleepingcomputer.com/feed/"
+  - url: "https://feeds.feedburner.com/TheHackersNews"
+  - url: "https://www.darkreading.com/rss.xml"
+  - url: "https://www.schneier.com/feed/atom/"
+  - url: "https://www.cisa.gov/cybersecurity-advisories/all.xml"
+  - url: "https://isc.sans.edu/rssfeed.xml"
+  - url: "https://googleprojectzero.blogspot.com/feeds/posts/default"
+  - url: "https://feeds.feedburner.com/securityweek"
+  # - url: "https://blog.talosintelligence.com/feeds/posts/default"  # FAIL: 404
+
+  # Education
+  - url: "https://feweek.co.uk/feed/"
+  - url: "https://www.fenews.co.uk/feed/"
+  - url: "https://wonkhe.com/blogs/feed/"
+  - url: "https://theconversation.com/uk/education/articles.atom"
+  - url: "https://www.hepi.ac.uk/feed/"
+  - url: "https://www.gov.uk/search/news-and-communications.atom?organisations%5B%5D=department-for-education"
+  - url: "https://www.nature.com/nature.rss"
+  # - url: "https://www.jisc.ac.uk/news/rss"  # FAIL: 403
+  # - url: "https://feeds.feedburner.com/tesnews"  # FAIL: 404
+  # - url: "https://www.officeforstudents.org.uk/news-blog-and-events/rss/"  # FAIL: 404
+  # - url: "https://www.qaa.ac.uk/rss/news"  # FAIL: 404
+  # - url: "https://www.timeshighereducation.com/rss.xml"  # FAIL: 403
+  # - url: "https://www.universitiesuk.ac.uk/rss.xml"  # FAIL: 403

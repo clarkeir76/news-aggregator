@@ -11,10 +11,9 @@ class Summarizer:
     """OpenAI-based text summarization"""
 
     def __init__(self, api_key: str, model: str = "gpt-4o-mini", max_tokens: int = 300):
-        self.api_key = api_key
         self.model = model
         self.max_tokens = max_tokens
-        openai.api_key = api_key
+        self.client = openai.OpenAI(api_key=api_key)
 
     def summarize(self, content: str, title: str = "") -> Optional[str]:
         """
@@ -40,7 +39,7 @@ Content: {content[:2000]}
 
 Summary:"""
 
-            response = openai.ChatCompletion.create(
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {
@@ -53,11 +52,11 @@ Summary:"""
                 temperature=0.5,
             )
 
-            summary = response["choices"][0]["message"]["content"].strip()
+            summary = response.choices[0].message.content.strip()
             logger.info(f"Generated summary ({len(summary)} chars)")
             return summary
 
-        except openai.error.OpenAIError as e:
+        except openai.OpenAIError as e:
             logger.error(f"OpenAI API error: {e}")
             return None
         except Exception as e:
@@ -85,7 +84,7 @@ New content: {new_content[:2000]}
 
 What's new:"""
 
-            response = openai.ChatCompletion.create(
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {
@@ -98,11 +97,11 @@ What's new:"""
                 temperature=0.5,
             )
 
-            summary = response["choices"][0]["message"]["content"].strip()
+            summary = response.choices[0].message.content.strip()
             logger.info(f"Generated update summary ({len(summary)} chars)")
             return summary
 
-        except openai.error.OpenAIError as e:
+        except openai.OpenAIError as e:
             logger.error(f"OpenAI API error: {e}")
             return None
         except Exception as e:

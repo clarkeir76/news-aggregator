@@ -2,150 +2,80 @@
 
 import logging
 import requests
-from typing import Optional, List
+from datetime import datetime, timezone
+from typing import List
 from .models import Article
 
 logger = logging.getLogger(__name__)
 
 
 class SlackNotifier:
-    """Send messages to Slack via webhooks"""
+    """Send digest messages to Slack via webhooks"""
 
     def __init__(self, webhook_urls: dict):
-        """
-        Initialize with webhook URLs per topic.
-
-        Args:
-            webhook_urls: Dict mapping topic -> webhook URL
-        """
         self.webhook_urls = webhook_urls
 
-    def notify(
-        self,
-        article: Article,
-        summary: str = "",
-        is_update: bool = False,
-    ) -> bool:
+    def notify_digest(self, articles: List[Article], summaries: dict = None) -> bool:
         """
-        Send article notification to appropriate Slack channel(s).
+        Send one digest message per topic channel containing all new articles.
 
         Args:
-            article: Article to notify about
-            summary: Summary text
-            is_update: Whether this is an update to existing article
+            articles: New articles to notify about
+            summaries: Dict mapping article URL -> summary text
 
         Returns:
-            True if notification sent successfully
-        """
-        success = True
-
-        for topic in article.topics:
-            if topic in self.webhook_urls:
-                webhook_url = self.webhook_urls[topic]
-                message = self._build_message(article, summary, is_update)
-
-                if not self._send_webhook(webhook_url, message):
-                    success = False
-
-        return success
-
-    def notify_batch(
-        self,
-        articles: List[Article],
-        summaries: dict = None,
-        is_updates: dict = None,
-    ) -> bool:
-        """
-        Send multiple article notifications.
-
-        Args:
-            articles: List of articles
-            summaries: Dict mapping article URL -> summary
-            is_updates: Dict mapping article URL -> is_update flag
-
-        Returns:
-            True if all notifications sent successfully
+            True if all webhooks responded successfully
         """
         summaries = summaries or {}
-        is_updates = is_updates or {}
-        success = True
 
+        by_topic: dict = {}
         for article in articles:
-            summary = summaries.get(article.url, "")
-            is_update = is_updates.get(article.url, False)
+            for topic in article.topics:
+                if topic in self.webhook_urls:
+                    by_topic.setdefault(topic, []).append(article)
 
-            if not self.notify(article, summary, is_update):
+        if not by_topic:
+            logger.info("No articles matched configured webhook topics")
+            return True
+
+        success = True
+        for topic, topic_articles in by_topic.items():
+            message = self._build_digest(topic, topic_articles, summaries)
+            if not self._send_webhook(self.webhook_urls[topic], message):
                 success = False
 
         return success
 
     @staticmethod
-    def _build_message(article: Article, summary: str = "", is_update: bool = False) -> dict:
-        """Build Slack message payload"""
-        emoji = "🔄" if is_update else "📰"
-        header = f"{emoji} {'UPDATE: ' if is_update else ''}{article.title}"
+    def _build_digest(topic: str, articles: List[Article], summaries: dict) -> dict:
+        """Build a flat payload for a Slack Workflow Builder webhook."""
+        count = len(articles)
+        noun = "article" if count == 1 else "articles"
+        topic_label = topic.replace("_", " ").title()
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-        fields = [
-            {
-                "title": "Source",
-                "value": article.source,
-                "short": True,
-            },
-            {
-                "title": "Topics",
-                "value": ", ".join(article.topics),
-                "short": True,
-            },
-            {
-                "title": "Published",
-                "value": article.published_at.strftime("%Y-%m-%d %H:%M UTC"),
-                "short": True,
-            },
-        ]
+        lines = [f":newspaper: *{topic_label} Digest — {count} new {noun}* | {timestamp}"]
 
-        if summary:
-            fields.append(
-                {
-                    "title": "Summary",
-                    "value": summary,
-                    "short": False,
-                }
-            )
+        for article in articles:
+            lines.append(f"\n*<{article.url}|{article.title}>*")
+            lines.append(f"source: {article.source} | {article.published_at.strftime('%Y-%m-%d %H:%M UTC')}")
+            summary = summaries.get(article.url)
+            if summary:
+                lines.append(summary)
 
-        message = {
-            "username": "News Aggregator",
-            "icon_emoji": ":newspaper:",
-            "attachments": [
-                {
-                    "color": "#0099ff" if is_update else "#36a64f",
-                    "title": header,
-                    "title_link": article.url,
-                    "fields": fields,
-                    "footer": "News Aggregator System",
-                    "ts": int(article.published_at.timestamp()),
-                }
-            ],
-        }
-
-        return message
+        return {"payload": "\n".join(lines)}
 
     @staticmethod
     def _send_webhook(webhook_url: str, message: dict) -> bool:
         """Send message to Slack webhook"""
         try:
-            response = requests.post(
-                webhook_url,
-                json=message,
-                timeout=10,
-            )
+            response = requests.post(webhook_url, json=message, timeout=10)
 
             if response.status_code == 200:
-                logger.info("Slack message sent successfully")
+                logger.info("Slack digest sent successfully")
                 return True
             else:
-                logger.error(
-                    f"Slack webhook returned {response.status_code}: {response.text}"
-                )
+                logger.error(f"Slack webhook returned {response.status_code}: {response.text}")
                 return False
 
         except requests.RequestException as e:

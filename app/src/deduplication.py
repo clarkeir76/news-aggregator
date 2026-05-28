@@ -1,9 +1,8 @@
 """Deduplication module"""
 
 import logging
-from typing import List, Set, Tuple
+from typing import List, Optional, Tuple
 from rapidfuzz import fuzz
-from urllib.parse import urlparse
 
 from .models import Article
 
@@ -13,11 +12,11 @@ logger = logging.getLogger(__name__)
 class Deduplicator:
     """Article deduplication"""
 
-    def __init__(self, title_similarity_threshold: float = 0.85):
+    def __init__(self, title_similarity_threshold: float = 85.0):
         self.title_similarity_threshold = title_similarity_threshold
 
     def deduplicate(
-        self, articles: List[Article], existing_articles: List[Article] = None
+        self, articles: List[Article], existing_articles: Optional[List[Article]] = None
     ) -> Tuple[List[Article], dict]:
         """
         Deduplicate articles using exact and fuzzy matching.
