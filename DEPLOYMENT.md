@@ -1,302 +1,228 @@
 # Deployment Guide
 
-## Pre-deployment Checklist
+## Prerequisites
 
-- [ ] AWS Account with appropriate permissions
-- [ ] GitHub repository created and pushed
-- [ ] Terraform state S3 bucket created
-- [ ] OpenAI API key obtained
-- [ ] Slack workspace access and webhook URLs created
-- [ ] GitHub OIDC setup completed
+- AWS account with permissions to create Lambda, DynamoDB, EventBridge, IAM, S3, Secrets Manager
+- Terraform >= 1.0 installed
+- GitHub repository with Actions enabled
+- OpenAI API key
+- Slack workspace with Workflow Builder access
 
-## Step 1: AWS Setup
+---
 
-### Create Terraform State Bucket
+## Step 1: Slack Setup
+
+This system uses **Slack Workflow Builder** webhooks — not traditional incoming webhooks.
+
+For each topic channel (`#tech`, `#ai`, `#education`, `#cyber-security`):
+
+1. Open the channel in Slack → click the channel name → **Integrations** → **Add a Workflow**
+2. Create a new workflow → choose **"From a webhook"** as the trigger
+3. In "Set up variables", add one variable named `payload` (type: text)
+4. Add a **Send a message** step that uses the `payload` variable as the message body
+5. Publish the workflow
+6. Copy the webhook trigger URL
+
+You'll end up with four URLs:
+```
+SLACK_WEBHOOK_TECH=https://hooks.slack.com/triggers/...
+SLACK_WEBHOOK_AI=https://hooks.slack.com/triggers/...
+SLACK_WEBHOOK_EDUCATION=https://hooks.slack.com/triggers/...
+SLACK_WEBHOOK_CYBER_SECURITY=https://hooks.slack.com/triggers/...
+```
+
+---
+
+## Step 2: AWS Setup
+
+### Terraform state bucket
 
 ```bash
-# Create S3 bucket for state
 aws s3 mb s3://news-aggregator-terraform-state
 
-# Enable versioning
 aws s3api put-bucket-versioning \
   --bucket news-aggregator-terraform-state \
   --versioning-configuration Status=Enabled
-
-# Enable encryption
-aws s3api put-bucket-encryption \
-  --bucket news-aggregator-terraform-state \
-  --server-side-encryption-configuration '{
-    "Rules": [{
-      "ApplyServerSideEncryptionByDefault": {
-        "SSEAlgorithm": "AES256"
-      }
-    }]
-  }'
-
-# Create DynamoDB table for locks
-aws dynamodb create-table \
-  --table-name terraform-locks \
-  --attribute-definitions AttributeName=LockID,AttributeType=S \
-  --key-schema AttributeName=LockID,KeyType=HASH \
-  --billing-mode PAY_PER_REQUEST
 ```
 
-### Setup GitHub OIDC
+### GitHub OIDC (for CI/CD)
 
 ```bash
-# Run the setup script
 cd .github/scripts
 python setup-oidc.py
 ```
 
-This will:
-1. Create an OIDC provider
-2. Create an IAM role for GitHub Actions
-3. Attach necessary policies
+This creates an OIDC provider and an IAM role that GitHub Actions assumes. No long-lived credentials needed.
 
-## Step 2: Slack Setup
-
-### Create Slack Webhooks
-
-1. Go to https://api.slack.com/apps
-2. Create New App → From scratch
-3. For each topic (tech, ai, education, cyber_security):
-   - Go to "Incoming Webhooks"
-   - Create New Webhook to Channel
-   - Copy the webhook URL
-   - Save it securely
+---
 
 ## Step 3: GitHub Secrets
 
-Add the following secrets to your GitHub repository:
+Add these secrets to your GitHub repository (**Settings → Secrets and variables → Actions**):
 
-```
-AWS_ROLE_ARN
-OPENAI_API_KEY
-SLACK_WEBHOOK_TECH
-SLACK_WEBHOOK_AI
-SLACK_WEBHOOK_EDUCATION
-SLACK_WEBHOOK_CYBER_SECURITY
-```
+| Secret | Description |
+|---|---|
+| `AWS_ROLE_ARN` | ARN of the IAM role created by setup-oidc.py |
+| `OPENAI_API_KEY` | Your OpenAI API key |
+| `SLACK_WEBHOOK_TECH` | Workflow Builder URL for tech channel |
+| `SLACK_WEBHOOK_AI` | Workflow Builder URL for AI channel |
+| `SLACK_WEBHOOK_EDUCATION` | Workflow Builder URL for education channel |
+| `SLACK_WEBHOOK_CYBER_SECURITY` | Workflow Builder URL for cyber security channel |
+| `SLACK_DEPLOYMENT_WEBHOOK` | Optional — webhook for CI/CD deploy notifications |
+
+---
 
 ## Step 4: Deploy Infrastructure
 
-### Option A: Terraform CLI (Manual)
+### Option A: Terraform CLI
 
 ```bash
 cd infra/terraform
 
-# Initialize
 terraform init
 
-# Review plan (dev)
+# Review what will be created
 terraform plan -var-file=terraform.dev.tfvars
 
-# Deploy (dev)
+# Deploy
 terraform apply -var-file=terraform.dev.tfvars
+```
 
-# Deploy (prod)
+For production:
+```bash
 terraform apply \
   -var-file=terraform.prod.tfvars \
-  -var="openai_api_key=$(echo $OPENAI_API_KEY | base64 -d)" \
+  -var="openai_api_key=$OPENAI_API_KEY" \
   -var="slack_webhook_tech=$SLACK_WEBHOOK_TECH" \
   -var="slack_webhook_ai=$SLACK_WEBHOOK_AI" \
   -var="slack_webhook_education=$SLACK_WEBHOOK_EDUCATION" \
   -var="slack_webhook_cyber_security=$SLACK_WEBHOOK_CYBER_SECURITY"
 ```
 
-### Option B: GitHub Actions (Automated)
+### Option B: GitHub Actions (automated)
 
-Simply push to `main` branch:
+Push to `main` — the pipeline handles everything:
+1. Lint and test
+2. Terraform validate and plan
+3. Terraform apply
+4. Lambda deploy
 
-```bash
-git push origin main
+---
+
+## Step 5: Lambda Environment Variables
+
+After deploying via Terraform, set the following environment variables on the Lambda function (either via Terraform variables or the AWS console):
+
+```
+AWS_REGION=eu-west-1
+DYNAMODB_TABLE=news-articles
+OPENAI_API_KEY=<from Secrets Manager>
+OPENAI_MODEL=gpt-4o-mini
+ENABLE_SLACK=true
+ENABLE_SUMMARIZATION=true
+ENABLE_PERSISTENCE=true
+ENABLE_LLM_CLASSIFICATION=true
+FEED_CONFIG_PATH=/opt/config/feeds.yaml
+LOG_LEVEL=INFO
+MAX_ARTICLES_PER_FEED=50
+MAX_CONCURRENT_FEEDS=10
+SLACK_WEBHOOK_TECH=<from Secrets Manager>
+SLACK_WEBHOOK_AI=<from Secrets Manager>
+SLACK_WEBHOOK_EDUCATION=<from Secrets Manager>
+SLACK_WEBHOOK_CYBER_SECURITY=<from Secrets Manager>
 ```
 
-GitHub Actions will:
-1. Run tests and linting
-2. Validate Terraform
-3. Plan infrastructure changes
-4. Apply infrastructure
-5. Deploy Lambda function
+Note: `FEED_CONFIG_PATH` must be set to `/opt/config/feeds.yaml` in Lambda. This is where the build packages `config/feeds.yaml`.
 
-## Step 5: Verify Deployment
+---
 
-### Check Lambda Function
+## Step 6: Verify Deployment
 
 ```bash
-# List Lambda functions
-aws lambda list-functions --query 'Functions[?contains(FunctionName, `news-aggregator`)]'
+# Check Lambda exists
+aws lambda get-function --function-name news-aggregator
 
-# View Lambda logs
-aws logs tail /aws/lambda/news-aggregator --follow
-
-# Test Lambda invocation
+# Manually trigger a run
 aws lambda invoke \
   --function-name news-aggregator \
   --payload '{}' \
-  response.json
+  response.json && cat response.json
 
-cat response.json
-```
-
-### Check DynamoDB Table
-
-```bash
-# List tables
-aws dynamodb list-tables
-
-# Describe articles table
-aws dynamodb describe-table --table-name news-articles
-
-# Scan for articles
-aws dynamodb scan --table-name news-articles --max-items 5
-```
-
-### Check EventBridge Schedule
-
-```bash
-# List schedules
-aws scheduler list-schedules
-
-# View schedule details
-aws scheduler get-schedule --name news-aggregator-schedule
-```
-
-### Check CloudWatch Logs
-
-```bash
-# View recent logs
+# Tail logs
 aws logs tail /aws/lambda/news-aggregator --follow
 
-# View errors
+# Check for errors
 aws logs filter-log-events \
   --log-group-name /aws/lambda/news-aggregator \
   --filter-pattern "ERROR"
+
+# Check articles are being stored
+aws dynamodb scan --table-name news-articles --max-items 5
 ```
+
+---
 
 ## Troubleshooting
 
-### Lambda Function Not Invoked
+**No articles being ingested**
+- Check that feed URLs in `config/feeds.yaml` are reachable
+- Look for `Failed to fetch feed` in logs
+- Verify `FEED_CONFIG_PATH` points to the right location
 
-1. Check EventBridge schedule is enabled
-2. Verify Lambda has EventBridge invoke permission
-3. Check CloudWatch Logs for errors
+**LLM classification discarding everything**
+- Check OpenAI API key is valid and has quota
+- Set `ENABLE_LLM_CLASSIFICATION=false` to fall back to keyword matching temporarily
+- Check logs for `LLM classification failed`
 
-### No Articles in DynamoDB
+**Slack messages not arriving**
+- Verify the webhook URL is a Workflow Builder trigger URL (`hooks.slack.com/triggers/...`)
+- Check the workflow is **published** in Slack (not just saved as draft)
+- Confirm the workflow has a variable named exactly `payload`
+- Check logs for `Slack webhook returned`
 
-1. Check feed URLs in `config/feeds.yaml` are valid
-2. Verify RSS feeds are responding
-3. Check Lambda logs for ingestion errors
+**Lambda timeout**
+- Reduce `MAX_ARTICLES_PER_FEED` or `MAX_CONCURRENT_FEEDS`
+- Increase Lambda timeout in Terraform (currently 5 minutes)
+- Check if a specific feed is hanging (look for feeds with no completion log)
 
-### Summarization Not Working
+**DynamoDB errors**
+- Check `DYNAMODB_TABLE` matches the deployed table name
+- Verify the Lambda execution role has `dynamodb:PutItem`, `dynamodb:GetItem`, `dynamodb:UpdateItem`, `dynamodb:Query`, `dynamodb:Scan` permissions
 
-1. Verify OpenAI API key is correct
-2. Check API key has sufficient quota
-3. Monitor OpenAI error logs
+---
 
-### Slack Messages Not Sending
+## Cost Estimates
 
-1. Verify webhook URLs are correct
-2. Test webhook URL manually:
-```bash
-curl -X POST -H 'Content-type: application/json' \
-  --data '{"text":"Test"}' \
-  YOUR_WEBHOOK_URL
-```
-3. Check Lambda logs for Slack errors
+### Development (daily runs, 5 articles/feed)
+- Lambda: ~$0.00 (free tier)
+- DynamoDB: ~$0.50/month
+- OpenAI: ~$1–3/month
+- CloudWatch: ~$0.50/month
 
-## Scaling & Optimization
+**Total: ~$2–4/month**
 
-### DynamoDB
+### Production (hourly runs, 50 articles/feed)
+- Lambda: ~$1/month
+- DynamoDB: ~$2–5/month
+- OpenAI: ~$15–30/month (classification + summarisation)
+- CloudWatch: ~$1/month
 
-- Adjust read/write capacity based on load
-- Enable auto-scaling (already configured)
-- Monitor capacity utilization in CloudWatch
+**Total: ~$20–40/month**
 
-### Lambda
+---
 
-- Increase memory if timeouts occur (currently 512MB)
-- Increase timeout if processing large feeds (currently 5 min)
-- Reduce if costs are too high
+## Updating Feeds
 
-### EventBridge
+To add or remove RSS feeds, edit `config/feeds.yaml` and push to `main`. The CI/CD pipeline repackages the Lambda with the updated feeds file.
 
-- Adjust cron schedule for frequency
-- Current: `cron(0 */6 * * ? *)` (every 6 hours)
-- Options: hourly `cron(0 * * * ? *)`, daily `cron(0 12 * * ? *)`
-
-## Monitoring & Alerts
-
-### Create SNS Topic for Alarms
-
-```bash
-aws sns create-topic --name news-aggregator-alerts
-
-# Get ARN for CloudFormation
-aws sns get-topic-attributes \
-  --topic-arn arn:aws:sns:us-east-1:ACCOUNT:news-aggregator-alerts \
-  --attribute-names TopicArn
-```
-
-### Update Terraform
-
-Add to `terraform.prod.tfvars`:
-```hcl
-alarm_actions = ["arn:aws:sns:us-east-1:ACCOUNT:news-aggregator-alerts"]
-```
+---
 
 ## Cleanup
-
-### Destroy Infrastructure
 
 ```bash
 cd infra/terraform
 terraform destroy -var-file=terraform.prod.tfvars
-```
 
-### Remove AWS Resources
-
-```bash
-# Delete S3 state bucket
+# Remove state bucket
 aws s3 rb s3://news-aggregator-terraform-state --force
-
-# Delete OIDC provider
-aws iam delete-open-id-connect-provider \
-  --open-id-connect-provider-arn arn:aws:iam::ACCOUNT:oidc-provider/token.actions.githubusercontent.com
-
-# Delete IAM role
-aws iam delete-role-policy \
-  --role-name news-aggregator-github-actions \
-  --policy-name news-aggregator-github-actions-policy
-aws iam delete-role --role-name news-aggregator-github-actions
 ```
-
-## Cost Estimation
-
-### Typical Monthly Costs (Dev)
-
-- **Lambda**: ~$0.20 (1M requests/month at 1GB memory)
-- **DynamoDB**: ~$1.25 (on-demand)
-- **OpenAI API**: ~$2-5 (depending on usage)
-- **CloudWatch**: ~$0.50 (logs)
-
-**Total: ~$4-7/month**
-
-### Typical Monthly Costs (Prod)
-
-- **Lambda**: ~$0.50 (2M requests/month)
-- **DynamoDB**: ~$2-3 (provisioned + auto-scaling)
-- **OpenAI API**: ~$10-20 (higher usage)
-- **CloudWatch**: ~$1 (more logs)
-- **Terraform State**: ~$0.50 (S3)
-
-**Total: ~$14-27/month**
-
-## Support
-
-For issues or questions:
-1. Check CloudWatch Logs
-2. Review GitHub Actions workflow runs
-3. Verify all secrets are set correctly
-4. Check AWS resource quotas

@@ -1,581 +1,132 @@
-# Design Decisions & Rationale
+# Design Decisions
 
-This document explains the key architectural decisions and trade-offs made in building this news aggregation system.
-
-## Technology Choices
-
-### Python 3.12
-
-**Why**: Modern Python version with type hints support, performance improvements, and better async handling.
-
-**Alternatives Considered**:
-- **Node.js**: Could work, but Python is better for data processing and NLP
-- **Go**: Fast and efficient, but overkill for this use case
-
-**Trade-off**: Slightly slower than Go/Rust, but better developer experience and ecosystem.
+Key decisions and the reasoning behind them.
 
 ---
 
-### Feedparser for RSS Ingestion
+## Classify before fetching article content
 
-**Why**: Mature, reliable, handles malformed RSS feeds gracefully.
+**Decision**: RSS title and summary are classified by the LLM before any full article text is fetched. Only articles that match a topic have their full text retrieved.
 
-**Alternative**: Direct HTTP + XML parsing
-- ❌ Would require handling all edge cases manually
-- ❌ No built-in handling of RSS/Atom variations
+**Why**: Fetching full article text is slow (one HTTP request per article, often with JS-heavy sites). Running it on every article before knowing whether we care about it wastes most of that time — typical runs see ~70% of articles discarded at classification. Classifying on RSS content first (which is free — already in the feed) means article fetching only happens for the ~30% that matters.
 
-**Decision**: Use feedparser and accept ~0.1s overhead per feed.
+**Trade-off**: Classification accuracy is slightly lower without full article text, since it relies on RSS titles and summaries. In practice this is acceptable — titles and summaries describe the topic well enough for filtering purposes, and any edge cases are caught in subsequent runs.
 
 ---
 
-### Keyword-Based Topic Classification
+## LLM classification with keyword fallback
 
-**Why**: 
-1. Fast (microseconds vs. seconds with LLM)
-2. Deterministic (same input → same output)
-3. Cost-free
-4. Easily replaceable
+**Decision**: `LLMClassifier` is the default. `KeywordClassifier` is used as a fallback when the API call fails, or when `ENABLE_LLM_CLASSIFICATION=false`.
 
-**Alternative**: LLM-based classification
-- ✅ More accurate for nuanced topics
-- ❌ Expensive (~$0.001 per article)
-- ❌ Slower (500ms-1s per article)
-- 🔄 Easy to swap in later
+**Why LLM over keywords**:
+- Better accuracy — understands context, not just word presence
+- Can reject articles (keywords have no confidence in rejection)
+- A single batched API call covers all articles, so cost is low (~$0.001–0.005 per run)
+- Handles nuance — "university suffers ransomware attack" correctly maps to both `education` and `cyber_security`; pure keyword matching struggles with this
 
-**Decision**: Start with keywords, add LLM option in v2.0
-
-**Implementation**: Extensible via config, simple to migrate to LLM.
+**Why keep keywords as fallback**:
+- Protects against API outages
+- Predictable, deterministic behaviour for debugging
+- Zero cost if LLM is unavailable
 
 ---
 
-### RapidFuzz for Fuzzy Deduplication
+## Single batched LLM call for classification
 
-**Why**:
-1. Fast C-based implementation
-2. Handles typos and minor variations
-3. 85% threshold is good balance
+**Decision**: All article titles and summaries for a given run are sent to the LLM in one API call, not one call per article.
 
-**Threshold Tuning**:
-- `85%`: Catches most duplicates, few false positives ✓
-- `90%`: Misses valid duplicates
-- `80%`: Too many false positives
-
-**Alternative**: Edit distance or machine learning
-- ❌ More complex, slower
-- ❌ Harder to tune threshold
-
-**Decision**: RapidFuzz with 85% threshold.
+**Why**: Per-article calls would add 0.5–1s per article and multiply API costs. With 48 feeds × 5 articles = 240 articles, per-article calls would take 2–4 minutes just for classification. A single batch call takes 5–15 seconds regardless of article count and costs roughly the same as a handful of individual calls.
 
 ---
 
-### DynamoDB for Persistence
+## trafilatura for full article extraction
 
-**Why**:
-1. Serverless (no ops overhead)
-2. Pay-per-request is economical for this scale
-3. Global secondary indexes for flexible queries
-4. Built-in encryption and backups
-5. Scales automatically
+**Decision**: Use `trafilatura` to extract main article text from HTML pages when RSS content is insufficient.
 
-**Comparison Matrix**:
+**Why over alternatives**:
+- Built on Mozilla's readability algorithm — handles diverse page layouts well
+- Actively maintained
+- Handles encoding, boilerplate removal and link stripping automatically
+- Graceful failure — returns `None` if it can't extract, letting the pipeline continue with RSS summary
 
-| Aspect | DynamoDB | PostgreSQL | MongoDB |
-|--------|----------|-----------|---------|
-| **Ops Overhead** | Zero | Medium | Medium |
-| **Pricing** | Pay/req | Per instance | Per instance |
-| **Consistency** | Eventual | Strong | Tunable |
-| **Queries** | Key-based | Complex SQL | JSON queries |
-| **Scaling** | Auto | Manual | Auto |
-
-**Trade-offs**:
-- ❌ No complex joins (but we don't need them)
-- ❌ Eventually consistent (acceptable for news)
-- ✅ Scales effortlessly
-- ✅ Zero infrastructure to manage
-
-**Decision**: DynamoDB is right choice for serverless architecture.
+**Limitation**: Cannot handle JavaScript-rendered pages or paywalled content. These fall back to using the RSS summary.
 
 ---
 
-### GPT-4o-mini for Summarization
+## Concurrent feed fetching and content enrichment
 
-**Why**:
-1. Cost-effective (~$0.15 per 1M input tokens)
-2. Fast (500-1000ms)
-3. Good quality for news articles
-4. Efficient for summarization task
+**Decision**: Both feed fetching (`ingest_feeds`) and article content enrichment (`_enrich_content`) use `ThreadPoolExecutor` with a configurable worker count (`MAX_CONCURRENT_FEEDS`, default 10).
 
-**Model Comparison**:
+**Why threads over async**:
+- The bottleneck is network I/O — threads spend most time waiting, so CPU contention is minimal
+- No rewrite needed — `feedparser`, `trafilatura`, and `requests` are all synchronous
+- `ThreadPoolExecutor` is simple, well-understood, and handles errors gracefully
 
-| Model | Cost | Speed | Quality |
-|-------|------|-------|---------|
-| **GPT-4o-mini** | $0.15/1M | Fast | Good ✓ |
-| GPT-4o | $5/1M | Slow | Excellent |
-| GPT-3.5-turbo | $0.50/1M | Medium | Fair |
-| Claude 3.5 | $0.80/1M | Slow | Excellent |
-
-**Decision**: GPT-4o-mini optimal for cost/quality/speed balance.
-
-**Prompt Design**:
-```
-"Summarize in 2-3 sentences:
-- What happened
-- Why it matters  
-- What is new (if updated)"
-```
-
-This structure ensures summaries contain actionable info.
+**Why not multiprocessing**: Overhead of process creation outweighs benefits at this scale. The GIL is not a meaningful constraint for I/O-bound work.
 
 ---
 
-### AWS Lambda for Compute
+## Slack Workflow Builder webhooks
 
-**Why**:
-1. Event-driven architecture
-2. No servers to manage
-3. Pay-per-execution (~$0.0000167 per GB-second)
-4. Auto-scales to handle load
+**Decision**: Use Slack Workflow Builder trigger URLs rather than traditional incoming webhooks.
 
-**Comparison**:
+**Why**: Workflow Builder gives more control over how messages appear in channels without requiring a custom Slack app. The tradeoff is that the payload must be a flat JSON object with named variables — no attachments or blocks. The digest is pre-formatted as a single `payload` string using Slack's mrkdwn syntax (e.g. `*bold*`, `<url|title>`).
 
-| Aspect | Lambda | ECS | EC2 |
-|--------|--------|-----|-----|
-| **Ops Overhead** | None | Medium | High |
-| **Cost** | Usage-based | Hourly | Hourly |
-| **Startup Time** | Cold start | Seconds | Minutes |
-| **Max Duration** | 15 min | Unlimited | Unlimited |
-
-**Limitations Addressed**:
-- 15-minute timeout: Per-feed parallelization reduces per-feed time
-- Cold starts: Acceptable for scheduled tasks
-- Memory limits: 512MB sufficient for 100 articles
-
-**Decision**: Lambda perfect for scheduled batch processing.
+**One digest per topic per run**: Rather than posting one message per article, all matched articles for a topic are bundled into a single message per run. This prevents channel flooding and gives readers a clear "here's what happened" snapshot.
 
 ---
 
-### EventBridge for Scheduling
+## DynamoDB for persistence
 
-**Why**:
-1. Native AWS service (no third-party dependency)
-2. Cron expressions are standard
-3. Dead letter queues for reliability
-4. Minimal cost (~$0.40/million triggers)
+**Decision**: DynamoDB with a simple `ARTICLE#{uuid}` / `METADATA` key scheme and two GSIs.
 
-**Alternative**: CloudWatch Events
-- ❌ Deprecated in favor of EventBridge
-- ❌ Same pricing anyway
+**Why over relational databases**:
+- Serverless — no infrastructure to manage
+- Pay-per-request pricing suits batch workloads
+- GSIs provide URL and source/date lookups without complex joins
 
-**Schedule Strategy**:
-- **Dev**: Daily at noon (easy testing)
-- **Prod**: Every 6 hours (reasonable update frequency)
-
-**Decision**: EventBridge Scheduler is future-proof.
+**SK design**: The sort key is the static string `"METADATA"` rather than a timestamp. This means `get_item` and `update_item` can address any article by its UUID without needing to know when it was created.
 
 ---
 
-### Terraform for IaC
+## Three-layer deduplication
 
-**Why**:
-1. Platform-agnostic (multi-cloud capable)
-2. Modular design with reusable modules
-3. State management (important for team)
-4. Plan before apply (safer deployments)
+**Decision**: URL match → content hash → fuzzy title (≥85% similarity, same source only).
 
-**Alternatives**:
-- **CloudFormation**: AWS-specific, harder to read
-- **SAM**: Better for Lambda, but less flexible
-- **CDK**: Programmatic, but more complex
+**Why this order**: URL matching is O(1) and eliminates the most obvious duplicates. Content hashing catches identical articles reposted at different URLs. Fuzzy matching is most expensive (O(n²) against existing articles) so runs last.
 
-**Decision**: Terraform with modular structure scales to complex deployments.
+**Why fuzzy match is source-restricted**: Two different publications with similar headlines are not duplicates — they're independent coverage of the same story and should both appear. Fuzzy matching only applies within the same source domain.
+
+**Threshold at 85%**: Chosen to catch clear near-duplicates (minor edits to the same article) while avoiding false positives between genuinely different articles from the same source.
 
 ---
 
-### GitHub Actions for CI/CD
+## Structured JSON logging
 
-**Why**:
-1. Native GitHub integration
-2. Free tier is generous (2000 min/month)
-3. GitHub OIDC eliminates long-lived credentials
-4. Matrix builds for testing multiple environments
+**Decision**: All logs are JSON-formatted. Locally, logs write to both stdout and `logs/run.log`. In Lambda, stdout only (CloudWatch captures it).
 
-**Pipeline Stages**:
-1. **Lint & Test** (every commit)
-2. **Terraform Validate** (every commit)
-3. **Build Lambda** (main branch)
-4. **Terraform Plan** (PRs)
-5. **Deploy Infrastructure** (main)
-6. **Deploy Lambda** (main)
+**Why JSON**: Parseable by CloudWatch Logs Insights and any log aggregation tool. Field-based queries ("show me all ERROR logs from ingestion in the last hour") are possible without regex.
 
-**Security**: GitHub OIDC → AWS IAM (no credential rotation needed)
-
-**Decision**: GitHub Actions best for GitHub-hosted projects.
+**File logging locally**: Means the log file can be read directly without pasting terminal output. The file path is configurable via `LOG_FILE` and disabled automatically in Lambda (detected via `AWS_LAMBDA_FUNCTION_NAME`).
 
 ---
 
-## Architectural Decisions
+## Feature flags via environment variables
 
-### Modular Application Structure
+**Decision**: All major features (`ENABLE_SLACK`, `ENABLE_SUMMARIZATION`, `ENABLE_PERSISTENCE`, `ENABLE_LLM_CLASSIFICATION`) are controlled by environment variables with sensible defaults.
 
-**Design**:
-```
-app/src/
-├── ingestion.py       # Input
-├── classification.py  # Processing
-├── deduplication.py   # Filtering
-├── persistence.py     # Storage
-├── summarization.py   # AI
-├── slack_notifier.py  # Output
-└── orchestrator.py    # Coordination
-```
+**Why**: Enables four distinct testing modes without code changes:
+1. No AWS, no Slack — fastest local test
+2. `ENABLE_SLACK=log` — see what would be posted without actually posting
+3. LocalStack — full pipeline with local DynamoDB
+4. Production AWS — full pipeline
 
-**Why**: 
-- Each module has single responsibility
-- Easy to test independently
-- Easy to replace (e.g., classification algorithm)
-- Composable pipeline
-
-**Alternative**: Monolithic file
-- ❌ Hard to test
-- ❌ Hard to reuse components
-- ❌ Increases merge conflicts
-
-**Decision**: Modular is always better for maintainability.
+Each mode is a single `.env` change.
 
 ---
 
-### Hybrid Deduplication Strategy
+## Pre-commit test hook
 
-**Layers**:
-1. **URL** (primary): Exact matches within source
-2. **Content Hash** (secondary): Same article from different sources
-3. **Fuzzy Title** (tertiary): Similar titles from same source
+**Decision**: `tests/` runs automatically on every `git commit` via a pre-commit hook. The commit is blocked if any test fails.
 
-**Why This Order**:
-- URL deduplication is fastest (O(1) hash)
-- Content hash catches legitimate reposts
-- Fuzzy matching is most expensive, run last
-
-**Example Scenarios**:
-1. TechCrunch reposts same article → URL dedup
-2. News shared across multiple sources → Hash dedup
-3. Similar headline from same source → Fuzzy dedup
-
-**Trade-off**: May miss some fuzzy duplicates if similarity < 85%, but prevents over-filtering.
-
-**Decision**: Multi-layer approach captures most duplicates without false positives.
-
----
-
-### DynamoDB Schema Design
-
-**Key Strategy**:
-```
-pk: ARTICLE#{uuid}
-sk: METADATA#{timestamp}
-
-GSI 1: url_gsi_pk: URL#{url}
-GSI 2: source_date_gsi_pk: SOURCE#{source}
-       source_date_gsi_sk: DATE#{timestamp}
-```
-
-**Why**:
-- **PK strategy**: Easy to query articles by ID
-- **SK with timestamp**: Enables time-range queries
-- **GSI 1**: Efficient URL lookups (deduplication)
-- **GSI 2**: Query by source and date range
-
-**Alternative**: Single attribute as key
-- ❌ Less flexible queries
-- ❌ Harder to update efficiently
-
-**Decision**: Current schema supports 95% of use cases with good performance.
-
----
-
-### Secrets Management
-
-**Strategy**:
-1. Sensitive values in AWS Secrets Manager
-2. Lambda reads at runtime
-3. No secrets in code or config
-
-**Secrets Stored**:
-- OpenAI API key
-- Slack webhook URLs (per topic)
-
-**Alternative**: Environment variables
-- ❌ Less secure (visible in Lambda console)
-- ❌ Hard to rotate
-- ❌ Team coordination needed
-
-**Decision**: Secrets Manager for security and auditability.
-
----
-
-### Structured Logging
-
-**Format**: JSON with fields:
-```json
-{
-  "timestamp": "2024-01-15T10:30:45",
-  "level": "INFO",
-  "logger": "app.src.orchestrator",
-  "message": "Ingested 45 articles",
-  "extra_data": {...}
-}
-```
-
-**Why**:
-- Parseable by CloudWatch Logs
-- Easy to aggregate and search
-- Standard industry practice
-- Works with log analysis tools
-
-**Alternative**: Plain text
-- ❌ Hard to parse
-- ❌ Difficult to aggregate
-- ❌ Poor for long-term analysis
-
-**Decision**: JSON logging from the start.
-
----
-
-## Trade-offs & Compromises
-
-### Speed vs. Cost
-
-**Choice**: Optimize for cost at the expense of speed
-- ✅ Reduced OpenAI spend (using -mini model)
-- ✅ Efficient DynamoDB usage
-- ❌ Summaries take longer (~500ms each)
-- 🎯 Reasonable for scheduled batch process
-
-**Alternative**: Speed-optimized
-- Would cost ~10x more
-- Unnecessary for daily scheduled aggregation
-
-**Decision**: Cost-optimized is correct for use case.
-
----
-
-### Accuracy vs. Speed
-
-**Deduplication**:
-- ✅ 85% threshold catches most duplicates quickly
-- ❌ Some fuzzy duplicates at 84% similarity slip through
-- 🎯 Acceptable for news (even if 1-2 slip through)
-
-**Classification**:
-- ✅ Keyword classification is instant
-- ❌ Misses nuanced topics
-- 🎯 Can upgrade to LLM later without breaking changes
-
-**Decision**: Start simple, add sophistication when needed.
-
----
-
-### Complexity vs. Flexibility
-
-**Design Choice**: Simple, linear pipeline
-```python
-Ingest → Classify → Dedupe → Store → Summarize → Notify
-```
-
-**Alternative**: Complex DAG with parallelization
-- ❌ 5x more complex
-- ❌ Harder to debug
-- ✅ Slightly faster (~10% improvement)
-
-**Current limitations**:
-- Sequential feeds (not parallel)
-- Sequential summarization (not batched)
-
-**Future**: Can add parallelization when throughput increases.
-
-**Decision**: Simple > Complex (YAGNI principle)
-
----
-
-### Consistency vs. Availability
-
-**Choice**: Eventual consistency (DynamoDB default)
-- ✅ Higher availability
-- ✅ Better scalability
-- ❌ Slight delay in read consistency
-
-**Why acceptable**:
-- News doesn't require strong consistency
-- Eventual consistency acceptable for batch processing
-- Can be overridden to "strong" if needed
-
-**Alternative**: DynamoDB strong consistency
-- Would cost 2x more
-- Unnecessary for our use case
-
-**Decision**: Eventual consistency is correct choice.
-
----
-
-### Local vs. Cloud Development
-
-**Strategy**: 
-1. Local: Python modules without AWS
-2. Docker: LocalStack for testing Lambda behavior
-3. AWS: Real deployment
-
-**Benefits**:
-- ✅ Fast feedback loop locally
-- ✅ Test AWS-specific behavior in Docker
-- ✅ Confidence before production deploy
-
-**Alternative**: Cloud-only development
-- ❌ Slow iteration (deploy each change)
-- ❌ Risk of breaking production
-
-**Decision**: Multi-environment development strategy.
-
----
-
-## Future Enhancement Opportunities
-
-### Phase 2: Intelligence
-
-- [ ] LLM-based topic classification
-- [ ] Sentiment analysis
-- [ ] Article clustering (same story from multiple sources)
-- [ ] Trending topics detection
-
-### Phase 3: Scale
-
-- [ ] Parallel feed ingestion
-- [ ] Batch OpenAI summarization
-- [ ] User preferences and filtering
-- [ ] Multi-region deployment
-
-### Phase 4: Platform
-
-- [ ] Web UI dashboard
-- [ ] Email digests
-- [ ] Browser extension
-- [ ] Mobile app notifications
-
-### Phase 5: Intelligence
-
-- [ ] ML model for content quality
-- [ ] Author influence scoring
-- [ ] Cross-topic story linking
-- [ ] Real-time vs. scheduled hybrid
-
----
-
-## Performance Characteristics
-
-### Current Throughput
-
-```
-Per Run (6-hour schedule):
-- Feeds processed: 30-50
-- Articles ingested: 500-1000
-- Articles deduplicated: 400-800
-- Articles stored: 300-600
-- Articles summarized: 250-500
-- Articles notified: 250-500
-
-Execution time: 2-3 minutes
-Cost per run: $0.05-0.10
-```
-
-### Scalability Path
-
-| Stage | Feeds | Articles/day | Cost/month | Actions |
-|-------|-------|--------------|-----------|---------|
-| **Current** | 30 | ~1500 | $15 | Working ✓ |
-| **10x** | 300 | ~15000 | $45 | Parallelize ingestion |
-| **100x** | 3000 | ~150000 | $150 | Batch summarization |
-| **1000x** | 30000 | ~1500000 | $500 | Dedicated model, caching |
-
----
-
-## Lessons Learned
-
-### What Went Well
-
-1. **Modular design**: Easy to test and extend
-2. **Terraform modules**: Reusable and maintainable
-3. **GitHub Actions**: Smooth CI/CD pipeline
-4. **DynamoDB GSIs**: Flexible and performant queries
-5. **Error handling**: Graceful degradation works well
-
-### What to Improve
-
-1. **Parallel processing**: Sequential is bottleneck
-2. **Caching**: Could cache summaries for identical content
-3. **Monitoring**: More granular metrics needed
-4. **Testing**: Currently 70% coverage, target 90%+
-5. **Documentation**: Good, but examples could be richer
-
-### Technical Debt
-
-1. Mock OpenAI tests (currently just validate structure)
-2. Integration tests (currently only unit tests)
-3. Load testing (no performance benchmarks)
-4. Cost monitoring (no alerting on spend)
-
----
-
-## Recommendations for Adoption
-
-### For Beginners
-
-This codebase is good for learning:
-- ✅ Python best practices
-- ✅ AWS serverless architecture
-- ✅ Infrastructure as Code (Terraform)
-- ✅ CI/CD with GitHub Actions
-
-**Recommended reading order**:
-1. `README.md` - Overview
-2. `QUICKSTART.md` - Get running
-3. `ARCHITECTURE.md` - Understand design
-4. `app/src/` - Read actual code
-5. `infra/terraform/` - Learn Terraform
-
-### For Production Use
-
-**Before deploying to production**:
-1. [ ] Add monitoring dashboards
-2. [ ] Set up alerts for errors/cost
-3. [ ] Add integration tests
-4. [ ] Performance test with real scale
-5. [ ] Security audit
-6. [ ] Disaster recovery plan
-7. [ ] Cost forecasting
-
-**Recommended deployments**:
-1. Staging environment first
-2. Monitor for 1 week
-3. Gradual production rollout
-4. Keep previous Lambda version as rollback
-
----
-
-## References & Resources
-
-### AWS Documentation
-- [Lambda Best Practices](https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html)
-- [DynamoDB Design Patterns](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html)
-- [EventBridge Scheduler](https://docs.aws.amazon.com/scheduler/latest/UserGuide/)
-
-### Python
-- [Type Hints PEP 484](https://www.python.org/dev/peps/pep-0484/)
-- [Dataclasses](https://docs.python.org/3/library/dataclasses.html)
-- [Logging Best Practices](https://docs.python.org/3/howto/logging.html)
-
-### Terraform
-- [Terraform Best Practices](https://www.terraform.io/language)
-- [AWS Provider Documentation](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
-
-### CI/CD
-- [GitHub Actions Documentation](https://docs.github.com/en/actions)
-- [GitHub OIDC Provider](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect)
+**Why**: Prevents broken code from reaching the repo. The test suite runs in under 3 seconds (all mocked), so the overhead is negligible. `git commit --no-verify` is available if you genuinely need to bypass it.
