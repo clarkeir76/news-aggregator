@@ -15,7 +15,7 @@ class Summarizer:
         self.max_tokens = max_tokens
         self.client = openai.OpenAI(api_key=api_key)
 
-    def summarize(self, content: str, title: str = "") -> Optional[str]:
+    def summarize(self, content: str, title: str = "", topics: list = None) -> Optional[str]:
         """
         Generate a concise summary of content.
 
@@ -53,7 +53,8 @@ Summary:"""
             )
 
             summary = response.choices[0].message.content.strip()
-            logger.info(f"Generated summary ({len(summary)} chars)")
+            topic_str = f" [{', '.join(topics)}]" if topics else ""
+            logger.info(f"Generated summary{topic_str} ({len(summary)} chars)")
             return summary
 
         except openai.OpenAIError as e:

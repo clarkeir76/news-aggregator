@@ -255,7 +255,7 @@ class NewsAggregator:
 
         def summarise_one(pair):
             article, article_id = pair
-            summary = self.summarizer.summarize(article.content, article.title)
+            summary = self.summarizer.summarize(article.content, article.title, article.topics)
             if summary and self.store and article_id:
                 self.store.update_article(article_id, {"last_summary": summary})
             return article.url, summary
