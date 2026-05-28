@@ -184,10 +184,11 @@ class NewsAggregator:
         feeds_ok = self.stats.get("successful_feeds", 0)
         feeds_total = self.stats.get("total_feeds", 0)
         feeds_failed = self.stats.get("failed_feeds", 0)
+        feeds_empty = self.stats.get("feeds_no_new_articles", 0)
 
         logger.info(
             f"Run complete in {elapsed:.1f}s | "
-            f"Feeds: {feeds_ok}/{feeds_total} ok, {feeds_failed} failed | "
+            f"Feeds: {feeds_ok}/{feeds_total} ok, {feeds_empty} no new articles, {feeds_failed} failed | "
             f"Articles: {ingested} ingested, {classified} matched, {rejected} rejected | "
             f"Content: {classified} fetched | "
             f"Dedup: {unique} unique, {duplicates} duplicate(s) | "

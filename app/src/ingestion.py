@@ -101,6 +101,7 @@ class RSSIngester:
             "total_feeds": len(feed_configs),
             "successful_feeds": 0,
             "failed_feeds": 0,
+            "feeds_no_new_articles": 0,
             "total_articles": 0,
             "total_errors": 0,
         }
@@ -115,8 +116,10 @@ class RSSIngester:
                 all_articles.extend(articles)
                 stats["total_articles"] += len(articles)
                 stats["total_errors"] += errors
-                if errors > 0 or len(articles) == 0:
+                if errors > 0:
                     stats["failed_feeds"] += 1
+                elif len(articles) == 0:
+                    stats["feeds_no_new_articles"] += 1
                 else:
                     stats["successful_feeds"] += 1
 
