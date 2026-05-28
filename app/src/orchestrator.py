@@ -107,6 +107,7 @@ class NewsAggregator:
 
     def run(self) -> dict:
         logger.info("Starting news aggregation pipeline")
+        run_start = datetime.now(timezone.utc)
         self.stats = {
             "timestamp": datetime.utcnow().isoformat(),
             "feeds_processed": 0,
@@ -172,7 +173,27 @@ class NewsAggregator:
         if not self.stats["errors"]:
             self._save_last_run()
 
-        logger.info(f"Pipeline completed. Stats: {self.stats}")
+        elapsed = (datetime.now(timezone.utc) - run_start).total_seconds()
+        ingested = self.stats.get("articles_ingested", 0)
+        classified = self.stats.get("articles_classified", 0)
+        rejected = ingested - classified
+        duplicates = (self.stats.get("url_duplicates", 0)
+                      + self.stats.get("content_hash_duplicates", 0)
+                      + self.stats.get("title_fuzzy_duplicates", 0))
+        unique = self.stats.get("unique_output", classified)
+        feeds_ok = self.stats.get("successful_feeds", 0)
+        feeds_total = self.stats.get("total_feeds", 0)
+        feeds_failed = self.stats.get("failed_feeds", 0)
+
+        logger.info(
+            f"Run complete in {elapsed:.1f}s | "
+            f"Feeds: {feeds_ok}/{feeds_total} ok, {feeds_failed} failed | "
+            f"Articles: {ingested} ingested, {classified} matched, {rejected} rejected | "
+            f"Content: {classified} fetched | "
+            f"Dedup: {unique} unique, {duplicates} duplicate(s) | "
+            f"Summarised: {self.stats.get('articles_summarized', 0)} | "
+            f"Notified: {self.stats.get('articles_notified', 0)}"
+        )
         return self.stats
 
     def _enrich_content(self, articles: List[Article]) -> List[Article]:
