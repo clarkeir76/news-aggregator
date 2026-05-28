@@ -2,6 +2,7 @@
 
 import pytest
 from datetime import datetime
+from pathlib import Path
 from app.src.models import Article
 from app.src.orchestrator import NewsAggregator
 
@@ -164,6 +165,56 @@ def test_summarise_runs_concurrently(mocker, feed_config_file, article):
     assert article.url in summaries
     assert summaries[article.url] == "A summary."
     assert agg.stats["articles_summarized"] == 1
+
+
+def test_cutoff_uses_last_run_when_more_recent(tmp_path, feed_config_file):
+    """If last run was 1 hour ago, cutoff should be 1 hour ago (not 24 hours)."""
+    from datetime import datetime, timedelta, timezone
+    one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+    last_run_file = str(tmp_path / ".last_run")
+    Path(last_run_file).write_text(one_hour_ago.isoformat())
+
+    agg = NewsAggregator(
+        feed_config_path=feed_config_file,
+        enable_persistence=False,
+        max_article_age_hours=24,
+        last_run_file=last_run_file,
+    )
+    cutoff = agg.ingester.cutoff
+    assert cutoff is not None
+    twenty_three_hours_ago = datetime.now(timezone.utc) - timedelta(hours=23)
+    assert cutoff > twenty_three_hours_ago  # closer to 1h ago than 24h ago
+
+
+def test_cutoff_caps_at_max_age_when_last_run_older(tmp_path, feed_config_file):
+    """If last run was 3 days ago, cutoff should be capped at max_article_age_hours."""
+    from datetime import datetime, timedelta, timezone
+    three_days_ago = datetime.now(timezone.utc) - timedelta(days=3)
+    last_run_file = str(tmp_path / ".last_run")
+    Path(last_run_file).write_text(three_days_ago.isoformat())
+
+    agg = NewsAggregator(
+        feed_config_path=feed_config_file,
+        enable_persistence=False,
+        max_article_age_hours=24,
+        last_run_file=last_run_file,
+    )
+    cutoff = agg.ingester.cutoff
+    assert cutoff is not None
+    twenty_five_hours_ago = datetime.now(timezone.utc) - timedelta(hours=25)
+    assert cutoff > twenty_five_hours_ago  # within the last 24 hours
+
+
+def test_save_last_run_writes_file(tmp_path, feed_config_file):
+    from pathlib import Path
+    last_run_file = str(tmp_path / ".last_run")
+    agg = NewsAggregator(
+        feed_config_path=feed_config_file,
+        enable_persistence=False,
+        last_run_file=last_run_file,
+    )
+    agg._save_last_run()
+    assert Path(last_run_file).exists()
 
 
 def test_summarise_handles_failure_gracefully(mocker, feed_config_file, article):

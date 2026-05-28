@@ -55,6 +55,7 @@ def test_parse_date_falls_back_to_utcnow():
 
 
 def test_age_filter_rejects_old_articles(mocker):
+    from datetime import timezone
     mock_feed = MagicMock()
     mock_feed.bozo = False
     mock_feed.entries = [{
@@ -65,7 +66,9 @@ def test_age_filter_rejects_old_articles(mocker):
     }]
     mocker.patch("app.src.ingestion.feedparser.parse", return_value=mock_feed)
 
-    ingester = RSSIngester(max_age_hours=24)
+    from datetime import datetime, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+    ingester = RSSIngester(cutoff=cutoff)
     articles, _ = ingester.ingest_feed("https://example.com/rss")
     assert len(articles) == 0
 
@@ -81,12 +84,14 @@ def test_age_filter_accepts_recent_articles(mocker):
     }]
     mocker.patch("app.src.ingestion.feedparser.parse", return_value=mock_feed)
 
-    ingester = RSSIngester(max_age_hours=24)
+    from datetime import datetime, timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    ingester = RSSIngester(cutoff=cutoff)
     articles, _ = ingester.ingest_feed("https://example.com/rss")
     assert len(articles) == 1
 
 
-def test_age_filter_disabled_when_zero(mocker):
+def test_age_filter_disabled_when_no_cutoff(mocker):
     mock_feed = MagicMock()
     mock_feed.bozo = False
     mock_feed.entries = [{
@@ -97,7 +102,7 @@ def test_age_filter_disabled_when_zero(mocker):
     }]
     mocker.patch("app.src.ingestion.feedparser.parse", return_value=mock_feed)
 
-    ingester = RSSIngester(max_age_hours=0)  # 0 = no filter
+    ingester = RSSIngester(cutoff=None)
     articles, _ = ingester.ingest_feed("https://example.com/rss")
     assert len(articles) == 1
 
@@ -134,7 +139,7 @@ def test_ingest_feed_returns_articles(mocker):
     }]
     mocker.patch("app.src.ingestion.feedparser.parse", return_value=mock_feed)
 
-    ingester = RSSIngester(max_age_hours=0)  # disable age filter for this test
+    ingester = RSSIngester(cutoff=None)  # disable age filter for this test
     articles, errors = ingester.ingest_feed("https://example.com/rss")
 
     assert len(articles) == 1
@@ -174,7 +179,7 @@ def test_ingest_feed_skips_entries_without_title(mocker):
     ]
     mocker.patch("app.src.ingestion.feedparser.parse", return_value=mock_feed)
 
-    ingester = RSSIngester(max_age_hours=0)
+    ingester = RSSIngester(cutoff=None)
     articles, errors = ingester.ingest_feed("https://example.com/rss")
 
     assert len(articles) == 1
@@ -185,7 +190,7 @@ def test_ingest_feed_skips_entries_without_title(mocker):
 
 def test_ingest_feeds_aggregates_stats(mocker):
     # max_concurrent_feeds=1 keeps execution sequential so side_effect order is deterministic
-    ingester = RSSIngester(max_concurrent_feeds=1, max_age_hours=0)
+    ingester = RSSIngester(max_concurrent_feeds=1, cutoff=None)
     mocker.patch.object(ingester, "ingest_feed", side_effect=[
         ([MagicMock(), MagicMock()], 0),
         ([MagicMock()], 1),

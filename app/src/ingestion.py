@@ -5,7 +5,7 @@ import logging
 import socket
 import feedparser
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 from urllib.parse import urlparse
 import yaml
@@ -43,17 +43,12 @@ class RSSIngester:
         max_articles_per_feed: int = 50,
         timeout: int = 10,
         max_concurrent_feeds: int = 10,
-        max_age_hours: int = 24,
+        cutoff: Optional[datetime] = None,
     ):
         self.max_articles_per_feed = max_articles_per_feed
         self.timeout = timeout
         self.max_concurrent_feeds = max_concurrent_feeds
-        # Cutoff is fixed at init time so all feeds use the same window
-        self.cutoff = (
-            datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
-            if max_age_hours > 0
-            else None
-        )
+        self.cutoff = cutoff
 
     def ingest_feed(self, feed_url: str) -> Tuple[List[Article], int]:
         articles = []

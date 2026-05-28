@@ -38,6 +38,7 @@ class Config:
         self.max_concurrent_feeds = int(os.getenv("MAX_CONCURRENT_FEEDS", "10"))
         self.max_concurrent_summarizations = int(os.getenv("MAX_CONCURRENT_SUMMARIZATIONS", "5"))
         self.max_article_age_hours = int(os.getenv("MAX_ARTICLE_AGE_HOURS", "24"))
+        self.last_run_file = os.getenv("LAST_RUN_FILE", "logs/.last_run")
 
     def validate(self) -> bool:
         """Validate required configuration"""

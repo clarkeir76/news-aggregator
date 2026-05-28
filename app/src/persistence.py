@@ -143,6 +143,29 @@ class DynamoDBStore:
             logger.error(f"Error updating article: {e}")
             return False
 
+    def get_last_run_time(self) -> Optional[datetime]:
+        """Retrieve the timestamp of the last successful run."""
+        try:
+            response = self.table.get_item(Key={"pk": "SYSTEM#config", "sk": "last_run"})
+            item = response.get("Item")
+            if item:
+                return datetime.fromisoformat(item["timestamp"])
+            return None
+        except ClientError as e:
+            logger.error(f"Error retrieving last run time: {e}")
+            return None
+
+    def save_last_run_time(self, dt: datetime) -> None:
+        """Store the timestamp of a successful run."""
+        try:
+            self.table.put_item(Item={
+                "pk": "SYSTEM#config",
+                "sk": "last_run",
+                "timestamp": dt.isoformat(),
+            })
+        except ClientError as e:
+            logger.error(f"Error saving last run time: {e}")
+
     def get_recent_articles(self, limit: int = 100) -> List[StoredArticle]:
         """Get recent articles"""
         try:

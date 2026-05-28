@@ -2,7 +2,8 @@
 
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import List, Optional
 
 from .models import Article
@@ -47,15 +48,30 @@ class NewsAggregator:
         max_concurrent_feeds: int = 10,
         max_concurrent_summarizations: int = 5,
         max_article_age_hours: int = 24,
+        last_run_file: str = "logs/.last_run",
     ):
         self.feed_config_path = feed_config_path
         self.max_concurrent_feeds = max_concurrent_feeds
         self.max_concurrent_summarizations = max_concurrent_summarizations
+        self.max_article_age_hours = max_article_age_hours
+        self.last_run_file = last_run_file
+
+        # Store must be initialised before cutoff calculation (last run may come from DynamoDB)
+        self.store = None
+        if enable_persistence and dynamodb_table:
+            self.store = DynamoDBStore(
+                table_name=dynamodb_table,
+                region_name=aws_region,
+                endpoint_url=aws_endpoint_url,
+            )
+
+        cutoff = self._calculate_cutoff()
+        logger.info(f"Article cutoff: {cutoff.isoformat() if cutoff else 'none'}")
 
         self.ingester = RSSIngester(
             max_articles_per_feed=max_articles_per_feed,
             max_concurrent_feeds=max_concurrent_feeds,
-            max_age_hours=max_article_age_hours,
+            cutoff=cutoff,
         )
 
         self.classifier = (
@@ -66,14 +82,6 @@ class NewsAggregator:
 
         self.content_extractor = ContentExtractor()
         self.deduplicator = Deduplicator()
-
-        self.store = None
-        if enable_persistence and dynamodb_table:
-            self.store = DynamoDBStore(
-                table_name=dynamodb_table,
-                region_name=aws_region,
-                endpoint_url=aws_endpoint_url,
-            )
 
         self.summarizer = None
         if enable_summarization and openai_api_key:
@@ -159,6 +167,9 @@ class NewsAggregator:
             logger.error(f"Error in aggregation pipeline: {e}", exc_info=True)
             self.stats["errors"].append(str(e))
 
+        if not self.stats["errors"]:
+            self._save_last_run()
+
         logger.info(f"Pipeline completed. Stats: {self.stats}")
         return self.stats
 
@@ -184,6 +195,56 @@ class NewsAggregator:
 
         logger.info(f"Enriched content for {len(enriched)} articles")
         return enriched
+
+    def _calculate_cutoff(self) -> Optional[datetime]:
+        """
+        Returns the most recent of:
+          - now minus max_article_age_hours (hard cap)
+          - the last successful run time (from file or DynamoDB)
+
+        This means hourly runs only fetch the last hour; if the pipeline
+        hasn't run for 2 days it still caps at max_article_age_hours.
+        """
+        now = datetime.now(timezone.utc)
+
+        age_cutoff = (
+            now - timedelta(hours=self.max_article_age_hours)
+            if self.max_article_age_hours > 0
+            else None
+        )
+
+        last_run = self._load_last_run()
+
+        if last_run and age_cutoff:
+            return max(last_run, age_cutoff)  # most recent = tightest window
+        return last_run or age_cutoff
+
+    def _load_last_run(self) -> Optional[datetime]:
+        """Load last successful run time — DynamoDB if available, otherwise file."""
+        if self.store:
+            ts = self.store.get_last_run_time()
+            if ts:
+                return ts.replace(tzinfo=timezone.utc) if ts.tzinfo is None else ts
+
+        try:
+            text = Path(self.last_run_file).read_text().strip()
+            dt = datetime.fromisoformat(text)
+            return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+        except (FileNotFoundError, ValueError):
+            return None
+
+    def _save_last_run(self) -> None:
+        """Save successful run time — DynamoDB if available, always file."""
+        now = datetime.now(timezone.utc)
+
+        if self.store:
+            self.store.save_last_run_time(now)
+
+        try:
+            Path(self.last_run_file).parent.mkdir(parents=True, exist_ok=True)
+            Path(self.last_run_file).write_text(now.isoformat())
+        except OSError as e:
+            logger.warning(f"Could not write last run file: {e}")
 
     def _summarise(self, new_articles: list) -> dict:
         """Summarise new articles concurrently. Returns dict of url -> summary."""

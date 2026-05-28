@@ -57,6 +57,7 @@ def lambda_handler(event, context):
             max_concurrent_feeds=config.max_concurrent_feeds,
             max_concurrent_summarizations=config.max_concurrent_summarizations,
             max_article_age_hours=config.max_article_age_hours,
+            last_run_file=config.last_run_file,
         )
 
         # Run pipeline
