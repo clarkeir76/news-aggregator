@@ -1,6 +1,7 @@
 """RSS feed ingestion module"""
 
 import logging
+import socket
 import feedparser
 from datetime import datetime
 from typing import List, Optional, Tuple
@@ -56,7 +57,12 @@ class RSSIngester:
         logger.info(f"Ingesting feed: {feed_url}")
 
         try:
-            feed = feedparser.parse(feed_url, timeout=self.timeout)
+            old_timeout = socket.getdefaulttimeout()
+            socket.setdefaulttimeout(self.timeout)
+            try:
+                feed = feedparser.parse(feed_url)
+            finally:
+                socket.setdefaulttimeout(old_timeout)
 
             if not feed.entries:
                 logger.warning(f"No entries found in feed: {feed_url}")

@@ -30,9 +30,30 @@ def test_content_extractor_initializes():
     assert ContentExtractor() is not None
 
 
-def test_feedparser_imports():
+def test_feedparser_parse_accepts_no_timeout_kwarg():
+    """feedparser.parse() does not accept a timeout kwarg in v6 — must use socket."""
     import feedparser
-    assert callable(feedparser.parse)
+    import inspect
+    sig = inspect.signature(feedparser.parse)
+    assert "timeout" not in sig.parameters, (
+        "feedparser.parse() gained a timeout param — remove the socket workaround in ingestion.py"
+    )
+
+
+def test_feedparser_parse_called_without_timeout():
+    """RSSIngester must be able to call feedparser.parse() without raising TypeError."""
+    import feedparser
+    from unittest.mock import patch, MagicMock
+    mock_feed = MagicMock()
+    mock_feed.bozo = False
+    mock_feed.entries = []
+    with patch("feedparser.parse", return_value=mock_feed) as mock_parse:
+        from app.src.ingestion import RSSIngester
+        ingester = RSSIngester()
+        ingester.ingest_feed("https://example.com/rss")
+        # Verify parse was called with only the URL, no timeout kwarg
+        call_kwargs = mock_parse.call_args.kwargs if mock_parse.call_args else {}
+        assert "timeout" not in call_kwargs
 
 
 def test_boto3_resource_initializes():
