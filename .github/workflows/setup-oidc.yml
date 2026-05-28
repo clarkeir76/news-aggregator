@@ -1,0 +1,60 @@
+name: Setup GitHub OIDC for AWS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup-oidc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print Setup Instructions
+        run: |
+          echo "=== GitHub OIDC Setup Instructions ==="
+          echo ""
+          echo "1. Create an OpenID Connect provider in AWS:"
+          echo ""
+          echo "   aws iam create-open-id-connect-provider \\"
+          echo "     --url https://token.actions.githubusercontent.com \\"
+          echo "     --client-id-list sts.amazonaws.com \\"
+          echo "     --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1"
+          echo ""
+          echo "2. Create an IAM role for GitHub Actions:"
+          echo ""
+          echo '   aws iam create-role \'
+          echo '     --role-name news-aggregator-github-actions \'
+          echo '     --assume-role-policy-document file://- <<EOF'
+          echo '   {'
+          echo '     "Version": "2012-10-17",'
+          echo '     "Statement": ['
+          echo '       {'
+          echo '         "Effect": "Allow",'
+          echo '         "Principal": {'
+          echo '           "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"'
+          echo '         },'
+          echo '         "Action": "sts:AssumeRoleWithWebIdentity",'
+          echo '         "Condition": {'
+          echo '           "StringEquals": {'
+          echo '             "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",'
+          echo '             "token.actions.githubusercontent.com:sub": "repo:<GITHUB_ORG>/<REPO_NAME>:ref:refs/heads/main"'
+          echo '           }'
+          echo '         }'
+          echo '       }'
+          echo '     ]'
+          echo '   }'
+          echo '   EOF'
+          echo ""
+          echo "3. Attach policies to the role:"
+          echo ""
+          echo "   aws iam attach-role-policy \\"
+          echo "     --role-name news-aggregator-github-actions \\"
+          echo "     --policy-arn arn:aws:iam::aws:policy/PowerUserAccess"
+          echo ""
+          echo "4. Add GitHub secrets:"
+          echo ""
+          echo "   AWS_ROLE_ARN: arn:aws:iam::<ACCOUNT_ID>:role/news-aggregator-github-actions"
+          echo "   OPENAI_API_KEY: sk-..."
+          echo "   SLACK_WEBHOOK_TECH: https://hooks.slack.com/..."
+          echo "   SLACK_WEBHOOK_AI: https://hooks.slack.com/..."
+          echo "   SLACK_WEBHOOK_EDUCATION: https://hooks.slack.com/..."
+          echo "   SLACK_WEBHOOK_CYBER_SECURITY: https://hooks.slack.com/..."
+          echo ""

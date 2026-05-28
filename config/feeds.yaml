@@ -1,0 +1,41 @@
+# News feeds configuration
+# Format: URL: topic (can be multiple topics as a list)
+
+feeds:
+  # Tech
+  - url: "https://news.ycombinator.com/rss"
+    topics: ["tech"]
+  
+  - url: "https://feeds.arstechnica.com/arstechnica/index"
+    topics: ["tech"]
+  
+  - url: "https://feeds.techcrunch.com/techcrunch/"
+    topics: ["tech"]
+  
+  # AI
+  - url: "https://feeds.bloomberg.com/markets/news.rss"
+    topics: ["tech", "ai"]
+  
+  - url: "https://arxiv.org/list/cs.AI/rss"
+    topics: ["ai"]
+  
+  # Cyber Security
+  - url: "https://feeds.bleepingcomputer.com/feed/"
+    topics: ["cyber_security", "tech"]
+  
+  - url: "https://www.darkreading.com/rss.xml"
+    topics: ["cyber_security"]
+  
+  # Education
+  - url: "https://feeds.edweek.org/education-week/"
+    topics: ["education"]
+  
+  - url: "https://www.edsurge.com/feed"
+    topics: ["education", "tech"]
+
+# Slack webhooks configuration
+slack_webhooks:
+  tech: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+  education: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+  ai: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+  cyber_security: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
