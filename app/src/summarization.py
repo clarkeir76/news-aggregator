@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class Summarizer:
     """OpenAI-based text summarization"""
 
-    def __init__(self, api_key: str, model: str = "gpt-4o-mini", max_tokens: int = 300):
+    def __init__(self, api_key: str, model: str = "gpt-4o-mini", max_tokens: int = 150):
         self.model = model
         self.max_tokens = max_tokens
         self.client = openai.OpenAI(api_key=api_key)
@@ -27,11 +27,10 @@ class Summarizer:
             return None
 
         try:
-            prompt = f"""Summarize the following news article concisely in 2-3 sentences.
+            prompt = f"""Summarize the following news article in 1-2 sentences.
 Include:
 - What happened
 - Why it matters
-- Any new developments
 
 Title: {title}
 

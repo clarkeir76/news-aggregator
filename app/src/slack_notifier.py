@@ -60,7 +60,7 @@ class SlackNotifier:
         lines = [f":newspaper: *{topic_label} Digest — {count} new {noun}* | {timestamp}"]
 
         for article in articles:
-            lines.append(f"\n*<{article.url}|{article.title}>*")
+            lines.append(f"\n<{article.url}|{article.title}>")
             lines.append(f"source: {article.source} | {article.published_at.strftime('%Y-%m-%d %H:%M UTC')}")
             summary = summaries.get(article.url)
             if summary:
