@@ -27,7 +27,7 @@ feeds:
   - url: "https://feeds.arstechnica.com/arstechnica/index"
   - url: "https://techcrunch.com/feed/"
   - url: "https://www.theverge.com/rss/index.xml"
-  - url: "https://venturebeat.com/feed/"
+  - url: "https://venturebeat.com/feed"
   - url: "https://news.ycombinator.com/rss"
   - url: "https://rss.slashdot.org/Slashdot/slashdotMain"
   - url: "https://www.theregister.com/headlines.atom"
