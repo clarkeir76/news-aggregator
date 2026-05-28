@@ -4,7 +4,7 @@ Instructions for Claude Code when working in this repository.
 
 ## Before Committing
 
-After making any code changes, always check:
+After making any code changes, always check and update before committing — never leave as a follow-up:
 
 1. **Tests** — Do any existing tests need updating? Is there missing coverage for new behaviour? Run `venv/bin/pytest tests/ -v` to confirm all pass.
 2. **README.md** — Does the pipeline description, env vars table, or any other section need updating?
@@ -13,7 +13,11 @@ After making any code changes, always check:
 5. **DEPLOYMENT.md** — Are all environment variables in the Lambda setup section current?
 6. **API.md** — Do any function signatures or module descriptions need updating?
 
-If any of these need changes, make them before committing — don't leave them as a follow-up.
+## Using --no-verify
+
+`git commit --no-verify` MUST ONLY be used for commits with type `style:` (pure auto-formatting, zero behaviour change — e.g. running `black`).
+
+NEVER use `--no-verify` for `feat:`, `fix:`, `refactor:`, `docs:`, or any other commit type. The CI pipeline will fail the build if Python files change without corresponding `.md` updates (unless the commit message starts with `style:`). There is no way to bypass this.
 
 ## Pipeline Overview
 

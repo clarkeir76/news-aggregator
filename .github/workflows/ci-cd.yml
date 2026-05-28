@@ -58,6 +58,45 @@ jobs:
           flags: unittests
           fail_ci_if_error: false
 
+  docs-check:
+    name: Docs Updated With Code
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check .md files updated alongside app/src/ changes
+        run: |
+          COMMIT_MSG=$(git log -1 --format="%s")
+          PYTHON_CHANGED=$(git diff --name-only HEAD~1 HEAD | grep 'app/src/.*\.py' || true)
+          MD_CHANGED=$(git diff --name-only HEAD~1 HEAD | grep '\.md$' || true)
+
+          if [ -z "$PYTHON_CHANGED" ]; then
+            echo "No app/src/ Python files changed — skipping doc check"
+            exit 0
+          fi
+
+          if echo "$COMMIT_MSG" | grep -q '^style:'; then
+            echo "Style commit — doc check skipped"
+            exit 0
+          fi
+
+          if [ -z "$MD_CHANGED" ]; then
+            echo "ERROR: app/src/ Python files changed but no .md files updated."
+            echo ""
+            echo "Changed Python files:"
+            echo "$PYTHON_CHANGED"
+            echo ""
+            echo "Update README.md, ARCHITECTURE.md, DEPLOYMENT.md, API.md as needed."
+            echo "If genuinely no docs need updating, use a commit message starting with 'style:'"
+            exit 1
+          fi
+
+          echo "Doc check passed — .md files updated alongside code changes"
+
   terraform-validate:
     name: Terraform Validate
     runs-on: ubuntu-latest
