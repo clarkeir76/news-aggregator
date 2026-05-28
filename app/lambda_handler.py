@@ -26,6 +26,7 @@ def lambda_handler(event, context):
 
     Triggered by EventBridge scheduler daily.
     """
+    logger.info("*" * 80)
     logger.info(f"Lambda invoked with event: {event}")
 
     try:
