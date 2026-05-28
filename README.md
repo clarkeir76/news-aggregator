@@ -80,6 +80,7 @@ python app/lambda_handler.py
 | `LOG_LEVEL` | Logging level | `INFO` |
 | `MAX_ARTICLES_PER_FEED` | Articles fetched per RSS feed per run | `50` |
 | `MAX_SUMMARY_LENGTH` | Max summary length in tokens | `300` |
+| `MAX_CONCURRENT_FEEDS` | Number of feeds fetched in parallel | `10` |
 
 #### ENABLE_SLACK modes
 
@@ -174,6 +175,10 @@ Requires AWS credentials and deployed infrastructure (see Deployment).
 ### Tip: limit articles on first run
 
 With 48 feeds at 50 articles each, the first run fetches a large number of articles and makes many OpenAI API calls. Set `MAX_ARTICLES_PER_FEED=5` in `.env` for an initial test.
+
+### Concurrency
+
+Feeds are fetched in parallel using a thread pool (`MAX_CONCURRENT_FEEDS=10` by default). Since feed fetching is almost entirely network I/O, this gives roughly a 5-8x speedup over sequential fetching. Reduce this value if you hit rate limits from specific sites.
 
 ## Running Tests
 

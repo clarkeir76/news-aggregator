@@ -3,6 +3,7 @@
 import logging
 import socket
 import feedparser
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import List, Optional, Tuple
 from urllib.parse import urlparse
@@ -39,9 +40,15 @@ class FeedConfig:
 class RSSIngester:
     """RSS feed ingestion"""
 
-    def __init__(self, max_articles_per_feed: int = 50, timeout: int = 10):
+    def __init__(
+        self,
+        max_articles_per_feed: int = 50,
+        timeout: int = 10,
+        max_concurrent_feeds: int = 10,
+    ):
         self.max_articles_per_feed = max_articles_per_feed
         self.timeout = timeout
+        self.max_concurrent_feeds = max_concurrent_feeds
         self.extractor = ContentExtractor(fetch_timeout=timeout)
 
     def ingest_feed(self, feed_url: str) -> Tuple[List[Article], int]:
@@ -89,12 +96,11 @@ class RSSIngester:
 
     def ingest_feeds(self, feed_configs: List[FeedConfig]) -> Tuple[List[Article], dict]:
         """
-        Ingest multiple RSS feeds.
+        Ingest multiple RSS feeds concurrently.
 
         Returns:
             Tuple of (articles, stats)
         """
-        all_articles = []
         stats = {
             "total_feeds": len(feed_configs),
             "successful_feeds": 0,
@@ -103,16 +109,21 @@ class RSSIngester:
             "total_errors": 0,
         }
 
-        for feed_config in feed_configs:
-            articles, errors = self.ingest_feed(feed_config.url)
-            all_articles.extend(articles)
-            stats["total_articles"] += len(articles)
-            stats["total_errors"] += errors
+        all_articles = []
 
-            if errors > 0 or len(articles) == 0:
-                stats["failed_feeds"] += 1
-            else:
-                stats["successful_feeds"] += 1
+        with ThreadPoolExecutor(max_workers=self.max_concurrent_feeds) as executor:
+            futures = {
+                executor.submit(self.ingest_feed, fc.url): fc for fc in feed_configs
+            }
+            for future in as_completed(futures):
+                articles, errors = future.result()
+                all_articles.extend(articles)
+                stats["total_articles"] += len(articles)
+                stats["total_errors"] += errors
+                if errors > 0 or len(articles) == 0:
+                    stats["failed_feeds"] += 1
+                else:
+                    stats["successful_feeds"] += 1
 
         return all_articles, stats
 
@@ -128,10 +139,8 @@ class RSSIngester:
                 return None
 
             published_at = self._parse_date(entry)
-
             rss_content = self._extract_rss_content(entry)
             content = self.extractor.get_content(url, rss_content)
-
             source = urlparse(feed_url).netloc
 
             return Article(

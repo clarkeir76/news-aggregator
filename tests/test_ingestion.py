@@ -138,7 +138,8 @@ def test_ingest_feed_skips_entries_without_title(mocker):
 # --- RSSIngester.ingest_feeds ---
 
 def test_ingest_feeds_aggregates_stats(mocker):
-    ingester = RSSIngester()
+    # max_concurrent_feeds=1 keeps execution sequential so side_effect order is deterministic
+    ingester = RSSIngester(max_concurrent_feeds=1)
     mocker.patch.object(ingester, "ingest_feed", side_effect=[
         ([MagicMock(), MagicMock()], 0),
         ([MagicMock()], 1),
@@ -152,3 +153,26 @@ def test_ingest_feeds_aggregates_stats(mocker):
     assert stats["successful_feeds"] == 1
     assert stats["failed_feeds"] == 1
     assert len(articles) == 3
+
+
+def test_ingest_feeds_runs_concurrently(mocker):
+    """Feeds should be fetched in parallel — all results collected regardless of order."""
+    import time
+
+    def slow_ingest(url):
+        time.sleep(0.05)
+        return ([MagicMock()], 0)
+
+    ingester = RSSIngester(max_concurrent_feeds=5)
+    mocker.patch.object(ingester, "ingest_feed", side_effect=slow_ingest)
+
+    configs = [FeedConfig(f"https://feed{i}.com/rss") for i in range(5)]
+
+    start = time.time()
+    articles, stats = ingester.ingest_feeds(configs)
+    elapsed = time.time() - start
+
+    # 5 feeds × 50ms each = 250ms sequentially; concurrent should finish in ~50-100ms
+    assert elapsed < 0.2, f"Expected concurrent execution but took {elapsed:.2f}s"
+    assert stats["total_feeds"] == 5
+    assert stats["total_articles"] == 5

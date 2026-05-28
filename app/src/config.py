@@ -34,6 +34,7 @@ class Config:
         # Limits
         self.max_articles_per_feed = int(os.getenv("MAX_ARTICLES_PER_FEED", "50"))
         self.max_summary_length = int(os.getenv("MAX_SUMMARY_LENGTH", "300"))
+        self.max_concurrent_feeds = int(os.getenv("MAX_CONCURRENT_FEEDS", "10"))
 
     def validate(self) -> bool:
         """Validate required configuration"""

@@ -28,7 +28,11 @@ def feed_config_file(tmp_path):
 # --- Initialisation ---
 
 def test_no_store_when_persistence_disabled(feed_config_file):
-    aggregator = NewsAggregator(feed_config_path=feed_config_file, enable_persistence=False)
+    aggregator = NewsAggregator(
+        feed_config_path=feed_config_file,
+        enable_persistence=False,
+        max_concurrent_feeds=1,
+    )
     assert aggregator.store is None
 
 

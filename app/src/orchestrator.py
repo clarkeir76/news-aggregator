@@ -31,10 +31,14 @@ class NewsAggregator:
         slack_dry_run: bool = False,
         enable_persistence: bool = True,
         max_articles_per_feed: int = 50,
+        max_concurrent_feeds: int = 10,
     ):
         self.feed_config_path = feed_config_path
 
-        self.ingester = RSSIngester(max_articles_per_feed=max_articles_per_feed)
+        self.ingester = RSSIngester(
+            max_articles_per_feed=max_articles_per_feed,
+            max_concurrent_feeds=max_concurrent_feeds,
+        )
         self.classifier = KeywordClassifier()
         self.deduplicator = Deduplicator()
 
