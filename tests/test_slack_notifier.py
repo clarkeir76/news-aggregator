@@ -60,9 +60,10 @@ def test_build_digest_omits_summary_when_absent(article):
     assert "A concise summary" not in payload
 
 
-def test_build_digest_title_is_hyperlinked(article):
+def test_build_digest_title_and_url_are_separate(article):
     payload = SlackNotifier._build_digest("tech", [article], {})["payload"]
-    assert f"<{article.url}|{article.title}>" in payload
+    assert f"*{article.title}*" in payload
+    assert article.url in payload
 
 
 def test_build_digest_topic_label_formats_underscore():
