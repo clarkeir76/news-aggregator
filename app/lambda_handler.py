@@ -11,10 +11,9 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 # Add src directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.config import get_config
-from src.logging_setup import setup_logging
-from src.orchestrator import NewsAggregator
-import yaml
+from src.config import get_config  # noqa: E402
+from src.logging_setup import setup_logging  # noqa: E402
+from src.orchestrator import NewsAggregator  # noqa: E402
 
 # Setup logging
 logger = setup_logging("INFO")

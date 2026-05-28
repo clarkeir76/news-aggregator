@@ -1,10 +1,8 @@
 """Tests for RSS feed ingestion"""
 
-import pytest
 from datetime import datetime
 from unittest.mock import MagicMock
 from app.src.ingestion import FeedConfig, RSSIngester
-from app.src.models import Article
 
 
 # --- FeedConfig ---

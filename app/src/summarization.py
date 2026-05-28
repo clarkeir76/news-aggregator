@@ -29,7 +29,7 @@ class Summarizer:
             return None
 
         try:
-            prompt = f"""Summarize the following news article in one concise sentence covering what happened and why it matters.
+            prompt = f"""Summarize the following news article in one concise sentence covering what happened and why it matters.  # noqa: E501
 
 Title: {title}
 
@@ -42,7 +42,7 @@ Summary:"""
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a news summarization expert. Create clear, concise summaries.",
+                        "content": "You are a news summarization expert. Create clear, concise summaries.",  # noqa: E501
                     },
                     {"role": "user", "content": prompt},
                 ],
@@ -75,7 +75,7 @@ Summary:"""
             return None
 
         try:
-            prompt = f"""This news article has been updated. Summarize only the new information in 1-2 sentences.
+            prompt = f"""This news article has been updated. Summarize only the new information in 1-2 sentences.  # noqa: E501
 
 Previous summary: {old_summary}
 
@@ -88,7 +88,7 @@ What's new:"""
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a news summarization expert. Focus on what is new and different.",
+                        "content": "You are a news summarization expert. Focus on what is new and different.",  # noqa: E501
                     },
                     {"role": "user", "content": prompt},
                 ],

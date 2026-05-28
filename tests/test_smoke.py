@@ -64,7 +64,6 @@ def test_feedparser_parse_accepts_no_timeout_kwarg():
 
 def test_feedparser_parse_called_without_timeout():
     """RSSIngester must be able to call feedparser.parse() without raising TypeError."""
-    import feedparser
     from unittest.mock import patch, MagicMock
 
     mock_feed = MagicMock()

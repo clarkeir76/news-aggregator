@@ -13,10 +13,10 @@ logger = logging.getLogger(__name__)
 CLASSIFICATION_BATCH_SIZE = 50
 
 TOPICS = {
-    Topic.AI.value: "artificial intelligence, machine learning, LLMs, generative AI, AI research, AI products and companies",
-    Topic.TECH.value: "technology, software, startups, programming, cloud, hardware, developer tools (not specifically AI)",
-    Topic.CYBER_SECURITY.value: "security breaches, vulnerabilities, hacking, malware, ransomware, privacy, cybercrime",
-    Topic.EDUCATION.value: "schools, universities, students, teaching, educational policy, EdTech, academic research",
+    Topic.AI.value: "artificial intelligence, machine learning, LLMs, generative AI, AI research, AI products and companies",  # noqa: E501
+    Topic.TECH.value: "technology, software, startups, programming, cloud, hardware, developer tools (not specifically AI)",  # noqa: E501
+    Topic.CYBER_SECURITY.value: "security breaches, vulnerabilities, hacking, malware, ransomware, privacy, cybercrime",  # noqa: E501
+    Topic.EDUCATION.value: "schools, universities, students, teaching, educational policy, EdTech, academic research",  # noqa: E501
 }
 
 
@@ -54,7 +54,7 @@ class LLMClassifier:
 
         discarded = len(articles) - len(matched)
         logger.info(
-            f"LLM classification: {len(matched)} matched, {discarded} discarded from {len(articles)} articles"
+            f"LLM classification: {len(matched)} matched, {discarded} discarded from {len(articles)} articles"  # noqa: E501
         )
         return matched
 
@@ -68,7 +68,7 @@ class LLMClassifier:
             articles[i : i + CLASSIFICATION_BATCH_SIZE]
             for i in range(0, len(articles), CLASSIFICATION_BATCH_SIZE)
         ]
-        logger.info(f"Classifying {len(articles)} articles in {len(chunks)} batch(es)")
+        logger.info(f"Classifying {len(articles)} articles in {len(chunks)} batch(es)")  # noqa: E501
         for chunk in chunks:
             all_results.update(self._classify_chunk(chunk))
         return all_results
@@ -98,7 +98,7 @@ Topics:
 Rules:
 - Only assign a topic if the article clearly fits
 - An article can match multiple topics
-- If the article is general news (politics, sport, entertainment, weather) that doesn't fit any topic, exclude it
+- If the article is general news (politics, sport, entertainment, weather) that doesn't fit any topic, exclude it  # noqa: E501
 - Respond with valid JSON only, mapping article number to its matched topics (empty list = no match)
 
 Example: {{"1": ["tech"], "2": ["ai", "tech"], "3": [], "4": ["education", "cyber_security"]}}
@@ -111,7 +111,7 @@ Articles:
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a news classification assistant. Respond with valid JSON only.",
+                    "content": "You are a news classification assistant. Respond with valid JSON only.",  # noqa: E501
                 },
                 {"role": "user", "content": prompt},
             ],

@@ -1,6 +1,5 @@
 """Tests for data models"""
 
-import pytest
 from datetime import datetime
 from app.src.models import Article, StoredArticle, Topic
 

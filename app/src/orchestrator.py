@@ -200,7 +200,7 @@ class NewsAggregator:
 
         logger.info(
             f"Run complete in {elapsed:.1f}s | "
-            f"Feeds: {feeds_ok}/{feeds_total} ok, {feeds_empty} no new articles, {feeds_failed} failed | "
+            f"Feeds: {feeds_ok}/{feeds_total} ok, {feeds_empty} no new articles, {feeds_failed} failed | "  # noqa: E501
             f"Articles: {ingested} ingested, {classified} matched, {rejected} rejected | "
             f"Content: {classified} fetched | "
             f"Dedup: {unique} unique, {duplicates} duplicate(s) | "

@@ -1,0 +1,4 @@
+[flake8]
+max-line-length = 100
+# E203: black formats slices with spaces (e.g. a[1 : 2]) which flake8 flags incorrectly
+extend-ignore = E203
