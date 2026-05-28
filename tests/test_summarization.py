@@ -20,6 +20,7 @@ def summarizer(mock_client):
 
 # --- summarize ---
 
+
 def test_summarize_returns_none_for_short_content(summarizer, mock_client):
     result = summarizer.summarize("Too short", "Title")
     assert result is None
@@ -27,7 +28,9 @@ def test_summarize_returns_none_for_short_content(summarizer, mock_client):
 
 
 def test_summarize_returns_summary(summarizer, mock_client):
-    mock_client.chat.completions.create.return_value.choices[0].message.content = "Generated summary."
+    mock_client.chat.completions.create.return_value.choices[
+        0
+    ].message.content = "Generated summary."
 
     result = summarizer.summarize("A" * 100, "Test Title")
 
@@ -36,7 +39,9 @@ def test_summarize_returns_summary(summarizer, mock_client):
 
 
 def test_summarize_passes_title_and_content_to_prompt(summarizer, mock_client):
-    mock_client.chat.completions.create.return_value.choices[0].message.content = "Summary."
+    mock_client.chat.completions.create.return_value.choices[
+        0
+    ].message.content = "Summary."
 
     summarizer.summarize("A" * 100, "My Article Title")
 
@@ -61,6 +66,7 @@ def test_summarize_handles_unexpected_error(summarizer, mock_client):
 
 # --- summarize_update ---
 
+
 def test_summarize_update_returns_none_for_short_content(summarizer, mock_client):
     result = summarizer.summarize_update("Too short", "Previous summary", "Title")
     assert result is None
@@ -68,7 +74,9 @@ def test_summarize_update_returns_none_for_short_content(summarizer, mock_client
 
 
 def test_summarize_update_returns_summary(summarizer, mock_client):
-    mock_client.chat.completions.create.return_value.choices[0].message.content = "What's new."
+    mock_client.chat.completions.create.return_value.choices[
+        0
+    ].message.content = "What's new."
 
     result = summarizer.summarize_update("A" * 100, "Previous summary", "Title")
 
@@ -76,7 +84,9 @@ def test_summarize_update_returns_summary(summarizer, mock_client):
 
 
 def test_summarize_update_includes_previous_summary_in_prompt(summarizer, mock_client):
-    mock_client.chat.completions.create.return_value.choices[0].message.content = "Update."
+    mock_client.chat.completions.create.return_value.choices[
+        0
+    ].message.content = "Update."
 
     summarizer.summarize_update("A" * 100, "The original summary text", "Title")
 

@@ -53,7 +53,9 @@ class LLMClassifier:
                 matched.append(article)
 
         discarded = len(articles) - len(matched)
-        logger.info(f"LLM classification: {len(matched)} matched, {discarded} discarded from {len(articles)} articles")
+        logger.info(
+            f"LLM classification: {len(matched)} matched, {discarded} discarded from {len(articles)} articles"
+        )
         return matched
 
     def _classify_batch(self, articles: List[Article]) -> dict:
@@ -63,7 +65,7 @@ class LLMClassifier:
         """
         all_results = {}
         chunks = [
-            articles[i:i + CLASSIFICATION_BATCH_SIZE]
+            articles[i : i + CLASSIFICATION_BATCH_SIZE]
             for i in range(0, len(articles), CLASSIFICATION_BATCH_SIZE)
         ]
         logger.info(f"Classifying {len(articles)} articles in {len(chunks)} batch(es)")
@@ -81,8 +83,12 @@ class LLMClassifier:
 
         article_lines = []
         for num, article in indexed.items():
-            summary = (article.content[:300] if article.content else "").strip() or "No summary"
-            article_lines.append(f"{num}. Title: {article.title}\n   Summary: {summary}")
+            summary = (
+                article.content[:300] if article.content else ""
+            ).strip() or "No summary"
+            article_lines.append(
+                f"{num}. Title: {article.title}\n   Summary: {summary}"
+            )
 
         prompt = f"""Classify these news articles for a news aggregator.
 
@@ -131,24 +137,65 @@ class KeywordClassifier:
     def __init__(self):
         self.keywords = {
             Topic.AI.value: [
-                "artificial intelligence", "machine learning", "neural network",
-                "deep learning", "gpt", "llm", "large language model", "transformer",
-                "ai", "generative ai", "prompt", "embeddings",
+                "artificial intelligence",
+                "machine learning",
+                "neural network",
+                "deep learning",
+                "gpt",
+                "llm",
+                "large language model",
+                "transformer",
+                "ai",
+                "generative ai",
+                "prompt",
+                "embeddings",
             ],
             Topic.TECH.value: [
-                "technology", "software", "app", "startup", "github", "programming",
-                "code", "developer", "api", "cloud", "data", "computing", "web",
-                "mobile", "internet",
+                "technology",
+                "software",
+                "app",
+                "startup",
+                "github",
+                "programming",
+                "code",
+                "developer",
+                "api",
+                "cloud",
+                "data",
+                "computing",
+                "web",
+                "mobile",
+                "internet",
             ],
             Topic.CYBER_SECURITY.value: [
-                "security", "cybersecurity", "cyber security", "hacker", "breach",
-                "vulnerability", "malware", "ransomware", "encryption",
-                "authentication", "cyber attack", "data breach", "privacy",
+                "security",
+                "cybersecurity",
+                "cyber security",
+                "hacker",
+                "breach",
+                "vulnerability",
+                "malware",
+                "ransomware",
+                "encryption",
+                "authentication",
+                "cyber attack",
+                "data breach",
+                "privacy",
             ],
             Topic.EDUCATION.value: [
-                "education", "school", "university", "student", "learning",
-                "teacher", "course", "training", "classroom", "college",
-                "academic", "curriculum", "degree",
+                "education",
+                "school",
+                "university",
+                "student",
+                "learning",
+                "teacher",
+                "course",
+                "training",
+                "classroom",
+                "college",
+                "academic",
+                "curriculum",
+                "degree",
             ],
         }
 
@@ -157,7 +204,7 @@ class KeywordClassifier:
         matched = []
         for topic, keywords in self.keywords.items():
             for keyword in keywords:
-                if re.search(r'\b' + re.escape(keyword.lower()) + r'\b', text):
+                if re.search(r"\b" + re.escape(keyword.lower()) + r"\b", text):
                     matched.append(topic)
                     break
         return matched or [Topic.TECH.value]

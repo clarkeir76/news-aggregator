@@ -31,7 +31,9 @@ class ContentExtractor:
         if len(rss_content.strip()) >= MIN_CONTENT_LENGTH:
             return rss_content
 
-        logger.debug(f"RSS content too short ({len(rss_content)} chars), fetching: {url}")
+        logger.debug(
+            f"RSS content too short ({len(rss_content)} chars), fetching: {url}"
+        )
         fetched = self._fetch_and_extract(url)
 
         if fetched:

@@ -15,9 +15,13 @@ logger = logging.getLogger(__name__)
 class DynamoDBStore:
     """DynamoDB persistence for articles"""
 
-    def __init__(self, table_name: str, region_name: str = "us-east-1", endpoint_url: str = None):
+    def __init__(
+        self, table_name: str, region_name: str = "us-east-1", endpoint_url: str = None
+    ):
         self.table_name = table_name
-        self.dynamodb = boto3.resource("dynamodb", region_name=region_name, endpoint_url=endpoint_url)
+        self.dynamodb = boto3.resource(
+            "dynamodb", region_name=region_name, endpoint_url=endpoint_url
+        )
         self.table = self.dynamodb.Table(table_name)
 
     def save_article(self, article: Article) -> Optional[str]:
@@ -146,7 +150,9 @@ class DynamoDBStore:
     def get_last_run_time(self) -> Optional[datetime]:
         """Retrieve the timestamp of the last successful run."""
         try:
-            response = self.table.get_item(Key={"pk": "SYSTEM#config", "sk": "last_run"})
+            response = self.table.get_item(
+                Key={"pk": "SYSTEM#config", "sk": "last_run"}
+            )
             item = response.get("Item")
             if item:
                 return datetime.fromisoformat(item["timestamp"])
@@ -158,11 +164,13 @@ class DynamoDBStore:
     def save_last_run_time(self, dt: datetime) -> None:
         """Store the timestamp of a successful run."""
         try:
-            self.table.put_item(Item={
-                "pk": "SYSTEM#config",
-                "sk": "last_run",
-                "timestamp": dt.isoformat(),
-            })
+            self.table.put_item(
+                Item={
+                    "pk": "SYSTEM#config",
+                    "sk": "last_run",
+                    "timestamp": dt.isoformat(),
+                }
+            )
         except ClientError as e:
             logger.error(f"Error saving last run time: {e}")
 

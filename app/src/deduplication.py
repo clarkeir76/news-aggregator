@@ -60,12 +60,9 @@ class Deduplicator:
                 continue
 
             # Content hash match
-            if (
-                article.content_hash
-                and (
-                    article.content_hash in existing_content_hashes
-                    or article.content_hash in seen_content_hashes
-                )
+            if article.content_hash and (
+                article.content_hash in existing_content_hashes
+                or article.content_hash in seen_content_hashes
             ):
                 stats["content_hash_duplicates"] += 1
                 logger.debug(f"Duplicate content hash: {article.content_hash[:8]}")
@@ -73,7 +70,9 @@ class Deduplicator:
 
             # Fuzzy title + source match
             if self._is_fuzzy_duplicate(
-                article.title, article.source, existing_title_sources + seen_title_sources
+                article.title,
+                article.source,
+                existing_title_sources + seen_title_sources,
             ):
                 stats["title_fuzzy_duplicates"] += 1
                 logger.debug(f"Fuzzy duplicate: {article.title}")
@@ -110,6 +109,7 @@ class Deduplicator:
     @staticmethod
     def _is_same_source(source1: str, source2: str) -> bool:
         """Check if two sources are equivalent"""
+
         # Extract domain without www
         def normalize_source(s: str) -> str:
             s = s.replace("www.", "").split(".")[0].lower()

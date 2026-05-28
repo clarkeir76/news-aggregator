@@ -82,7 +82,7 @@ def test_topic_enum():
     assert Topic.AI.value == "ai"
     assert Topic.CYBER_SECURITY.value == "cyber_security"
     assert Topic.EDUCATION.value == "education"
-    
+
     topics = Topic.all_topics()
     assert len(topics) == 4
     assert "tech" in topics

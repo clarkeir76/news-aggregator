@@ -15,7 +15,9 @@ class Config:
         # AWS Configuration
         self.aws_region = os.getenv("AWS_REGION", "us-east-1")
         self.dynamodb_table = os.getenv("DYNAMODB_TABLE", "news-articles")
-        self.aws_endpoint_url = os.getenv("AWS_ENDPOINT_URL")  # set to http://localhost:4566 for LocalStack
+        self.aws_endpoint_url = os.getenv(
+            "AWS_ENDPOINT_URL"
+        )  # set to http://localhost:4566 for LocalStack
 
         # OpenAI Configuration
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -28,16 +30,24 @@ class Config:
         slack_mode = os.getenv("ENABLE_SLACK", "true").lower()
         self.enable_slack = slack_mode in ("true", "log")
         self.slack_dry_run = slack_mode == "log"
-        self.enable_summarization = os.getenv("ENABLE_SUMMARIZATION", "true").lower() == "true"
-        self.enable_persistence = os.getenv("ENABLE_PERSISTENCE", "true").lower() == "true"
-        self.enable_llm_classification = os.getenv("ENABLE_LLM_CLASSIFICATION", "true").lower() == "true"
+        self.enable_summarization = (
+            os.getenv("ENABLE_SUMMARIZATION", "true").lower() == "true"
+        )
+        self.enable_persistence = (
+            os.getenv("ENABLE_PERSISTENCE", "true").lower() == "true"
+        )
+        self.enable_llm_classification = (
+            os.getenv("ENABLE_LLM_CLASSIFICATION", "true").lower() == "true"
+        )
 
         # Limits
         self.max_articles_per_feed = int(os.getenv("MAX_ARTICLES_PER_FEED", "50"))
         self.max_summary_length = int(os.getenv("MAX_SUMMARY_LENGTH", "300"))
         self.max_concurrent_feeds = int(os.getenv("MAX_CONCURRENT_FEEDS", "10"))
         self.feed_timeout = int(os.getenv("FEED_TIMEOUT", "20"))
-        self.max_concurrent_summarizations = int(os.getenv("MAX_CONCURRENT_SUMMARIZATIONS", "5"))
+        self.max_concurrent_summarizations = int(
+            os.getenv("MAX_CONCURRENT_SUMMARIZATIONS", "5")
+        )
         self.max_article_age_hours = int(os.getenv("MAX_ARTICLE_AGE_HOURS", "24"))
         self.last_run_file = os.getenv("LAST_RUN_FILE", "config/.last_run")
 

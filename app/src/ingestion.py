@@ -26,7 +26,9 @@ class FeedConfig:
         try:
             with open(config_path, "r") as f:
                 config = yaml.safe_load(f)
-            return [cls(url=feed_item.get("url")) for feed_item in config.get("feeds", [])]
+            return [
+                cls(url=feed_item.get("url")) for feed_item in config.get("feeds", [])
+            ]
         except FileNotFoundError:
             logger.error(f"Feed config file not found: {config_path}")
             return []
@@ -69,7 +71,9 @@ class RSSIngester:
                 return [], 1
 
             if feed.bozo:
-                logger.warning(f"Feed parse warning for {feed_url}: {feed.bozo_exception}")
+                logger.warning(
+                    f"Feed parse warning for {feed_url}: {feed.bozo_exception}"
+                )
 
             entries = feed.entries[: self.max_articles_per_feed]
             for i, entry in enumerate(entries):
@@ -88,7 +92,9 @@ class RSSIngester:
                     f"({filtered} age-filtered, {errors} errors)"
                 )
             else:
-                logger.info(f"Ingested {len(articles)} articles from {feed_url} ({errors} errors)")
+                logger.info(
+                    f"Ingested {len(articles)} articles from {feed_url} ({errors} errors)"
+                )
 
         except Exception as e:
             logger.error(f"Failed to fetch feed {feed_url}: {e}")
@@ -96,7 +102,9 @@ class RSSIngester:
             logger.info(f"Ingested 0 articles from {feed_url} (1 errors)")
         return articles, errors
 
-    def ingest_feeds(self, feed_configs: List[FeedConfig]) -> Tuple[List[Article], dict]:
+    def ingest_feeds(
+        self, feed_configs: List[FeedConfig]
+    ) -> Tuple[List[Article], dict]:
         stats = {
             "total_feeds": len(feed_configs),
             "successful_feeds": 0,

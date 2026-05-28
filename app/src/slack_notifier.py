@@ -57,11 +57,15 @@ class SlackNotifier:
         topic_label = topic.replace("_", " ").title()
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-        lines = [f":newspaper: *{topic_label} Digest — {count} new {noun}* | {timestamp}"]
+        lines = [
+            f":newspaper: *{topic_label} Digest — {count} new {noun}* | {timestamp}"
+        ]
 
         for article in articles:
             lines.append(f"\n*{article.title}*\n{article.url}")
-            lines.append(f"source: {article.source} | {article.published_at.strftime('%Y-%m-%d %H:%M UTC')}")
+            lines.append(
+                f"source: {article.source} | {article.published_at.strftime('%Y-%m-%d %H:%M UTC')}"
+            )
             summary = summaries.get(article.url)
             if summary:
                 lines.append(summary)
@@ -78,7 +82,9 @@ class SlackNotifier:
                 logger.info("Slack digest sent successfully")
                 return True
             else:
-                logger.error(f"Slack webhook returned {response.status_code}: {response.text}")
+                logger.error(
+                    f"Slack webhook returned {response.status_code}: {response.text}"
+                )
                 return False
 
         except requests.RequestException as e:

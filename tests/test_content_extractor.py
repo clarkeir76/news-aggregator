@@ -16,8 +16,14 @@ def test_uses_rss_content_when_long_enough(extractor):
 
 
 def test_fetches_article_when_rss_too_short(mocker, extractor):
-    mocker.patch("app.src.content_extractor.trafilatura.fetch_url", return_value="<html>article</html>")
-    mocker.patch("app.src.content_extractor.trafilatura.extract", return_value="Full article text from page")
+    mocker.patch(
+        "app.src.content_extractor.trafilatura.fetch_url",
+        return_value="<html>article</html>",
+    )
+    mocker.patch(
+        "app.src.content_extractor.trafilatura.extract",
+        return_value="Full article text from page",
+    )
 
     result = extractor.get_content("https://example.com/article", "Short")
 
@@ -33,7 +39,9 @@ def test_falls_back_to_rss_when_fetch_returns_nothing(mocker, extractor):
 
 
 def test_falls_back_to_rss_when_extraction_returns_nothing(mocker, extractor):
-    mocker.patch("app.src.content_extractor.trafilatura.fetch_url", return_value="<html></html>")
+    mocker.patch(
+        "app.src.content_extractor.trafilatura.fetch_url", return_value="<html></html>"
+    )
     mocker.patch("app.src.content_extractor.trafilatura.extract", return_value=None)
 
     result = extractor.get_content("https://example.com/article", "Short RSS")

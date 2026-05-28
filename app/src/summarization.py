@@ -15,7 +15,9 @@ class Summarizer:
         self.max_tokens = max_tokens
         self.client = openai.OpenAI(api_key=api_key)
 
-    def summarize(self, content: str, title: str = "", topics: list = None) -> Optional[str]:
+    def summarize(
+        self, content: str, title: str = "", topics: list = None
+    ) -> Optional[str]:
         """
         Generate a concise summary of content.
 

@@ -19,23 +19,30 @@ def make_article(title, content="", url="https://example.com/article"):
 
 # --- KeywordClassifier ---
 
+
 @pytest.fixture
 def classifier():
     return KeywordClassifier()
 
 
 def test_classify_ai_article(classifier):
-    article = make_article("New GPT Model Released", "OpenAI released a new large language model")
+    article = make_article(
+        "New GPT Model Released", "OpenAI released a new large language model"
+    )
     assert "ai" in classifier.classify(article)
 
 
 def test_classify_security_article(classifier):
-    article = make_article("Major Security Breach", "A new vulnerability was discovered affecting millions")
+    article = make_article(
+        "Major Security Breach", "A new vulnerability was discovered affecting millions"
+    )
     assert "cyber_security" in classifier.classify(article)
 
 
 def test_classify_education_article(classifier):
-    article = make_article("New Online Learning Platform", "Universities adopt new e-learning for students")
+    article = make_article(
+        "New Online Learning Platform", "Universities adopt new e-learning for students"
+    )
     assert "education" in classifier.classify(article)
 
 
@@ -49,18 +56,24 @@ def test_classify_always_runs_regardless_of_preset_topics(classifier):
 
 
 def test_classify_default_to_tech(classifier):
-    article = make_article("Random Article", "This article has no clear topic keywords at all")
+    article = make_article(
+        "Random Article", "This article has no clear topic keywords at all"
+    )
     assert "tech" in classifier.classify(article)
 
 
 def test_keyword_classify_and_filter_keeps_all_articles(classifier):
     """KeywordClassifier never discards — no confidence in rejection."""
-    articles = [make_article("Sport scores today"), make_article("New AI model released")]
+    articles = [
+        make_article("Sport scores today"),
+        make_article("New AI model released"),
+    ]
     result = classifier.classify_and_filter(articles)
     assert len(result) == 2
 
 
 # --- LLMClassifier ---
+
 
 @pytest.fixture
 def mock_openai(mocker):
@@ -71,10 +84,15 @@ def mock_openai(mocker):
 
 def test_llm_classifier_assigns_topics(mock_openai):
     import json
-    mock_openai.chat.completions.create.return_value.choices[0].message.content = json.dumps({
-        "1": ["tech"],
-        "2": ["ai", "tech"],
-    })
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps(
+        {
+            "1": ["tech"],
+            "2": ["ai", "tech"],
+        }
+    )
 
     articles = [
         make_article("New iPhone Released", url="https://example.com/1"),
@@ -90,10 +108,15 @@ def test_llm_classifier_assigns_topics(mock_openai):
 
 def test_llm_classifier_discards_unmatched_articles(mock_openai):
     import json
-    mock_openai.chat.completions.create.return_value.choices[0].message.content = json.dumps({
-        "1": ["tech"],
-        "2": [],
-    })
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps(
+        {
+            "1": ["tech"],
+            "2": [],
+        }
+    )
 
     articles = [
         make_article("New developer tool", url="https://example.com/1"),
@@ -108,9 +131,14 @@ def test_llm_classifier_discards_unmatched_articles(mock_openai):
 
 def test_llm_classifier_strips_invalid_topics(mock_openai):
     import json
-    mock_openai.chat.completions.create.return_value.choices[0].message.content = json.dumps({
-        "1": ["tech", "sports", "finance"],
-    })
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps(
+        {
+            "1": ["tech", "sports", "finance"],
+        }
+    )
 
     articles = [make_article("Tech and sports news", url="https://example.com/1")]
     classifier = LLMClassifier(api_key="test-key")
@@ -122,11 +150,13 @@ def test_llm_classifier_strips_invalid_topics(mock_openai):
 def test_llm_classifier_falls_back_to_keywords_on_failure(mock_openai):
     mock_openai.chat.completions.create.side_effect = Exception("API error")
 
-    articles = [make_article(
-        "New vulnerability discovered",
-        "Hackers exploited a security breach in major software",
-        url="https://example.com/1",
-    )]
+    articles = [
+        make_article(
+            "New vulnerability discovered",
+            "Hackers exploited a security breach in major software",
+            url="https://example.com/1",
+        )
+    ]
     classifier = LLMClassifier(api_key="test-key")
     result = classifier.classify_and_filter(articles)
 
@@ -145,9 +175,9 @@ def test_llm_classifier_chunks_large_batches(mock_openai):
     import json
     from app.src.classification import CLASSIFICATION_BATCH_SIZE
 
-    mock_openai.chat.completions.create.return_value.choices[0].message.content = json.dumps(
-        {"1": ["tech"]}
-    )
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps({"1": ["tech"]})
 
     articles = [
         make_article(f"Article {i}", url=f"https://example.com/{i}")

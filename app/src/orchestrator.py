@@ -91,7 +91,9 @@ class NewsAggregator:
 
         self.notifier = None
         if enable_slack and slack_webhooks:
-            self.notifier = SlackNotifier(webhook_urls=slack_webhooks, dry_run=slack_dry_run)
+            self.notifier = SlackNotifier(
+                webhook_urls=slack_webhooks, dry_run=slack_dry_run
+            )
 
         self.stats = {
             "timestamp": "",
@@ -130,7 +132,9 @@ class NewsAggregator:
             articles, ingest_stats = self.ingester.ingest_feeds(feed_configs)
             self.stats.update(ingest_stats)
             self.stats["articles_ingested"] = len(articles)
-            logger.info(f"Ingested {len(articles)} articles from {len(feed_configs)} feeds")
+            logger.info(
+                f"Ingested {len(articles)} articles from {len(feed_configs)} feeds"
+            )
 
             # Step 2: Classify and filter
             articles = self.classifier.classify_and_filter(articles)
@@ -141,9 +145,15 @@ class NewsAggregator:
             articles = self._enrich_content(articles)
 
             # Step 4: Deduplicate
-            existing_articles = self.store.get_recent_articles(limit=1000) if self.store else []
-            logger.info(f"Retrieved {len(existing_articles)} existing articles for deduplication")
-            unique_articles, dedup_stats = self.deduplicator.deduplicate(articles, existing_articles)
+            existing_articles = (
+                self.store.get_recent_articles(limit=1000) if self.store else []
+            )
+            logger.info(
+                f"Retrieved {len(existing_articles)} existing articles for deduplication"
+            )
+            unique_articles, dedup_stats = self.deduplicator.deduplicate(
+                articles, existing_articles
+            )
             self.stats.update(dedup_stats)
 
             # Step 5: Persist
@@ -177,9 +187,11 @@ class NewsAggregator:
         ingested = self.stats.get("articles_ingested", 0)
         classified = self.stats.get("articles_classified", 0)
         rejected = ingested - classified
-        duplicates = (self.stats.get("url_duplicates", 0)
-                      + self.stats.get("content_hash_duplicates", 0)
-                      + self.stats.get("title_fuzzy_duplicates", 0))
+        duplicates = (
+            self.stats.get("url_duplicates", 0)
+            + self.stats.get("content_hash_duplicates", 0)
+            + self.stats.get("title_fuzzy_duplicates", 0)
+        )
         unique = self.stats.get("unique_output", classified)
         feeds_ok = self.stats.get("successful_feeds", 0)
         feeds_total = self.stats.get("total_feeds", 0)
@@ -203,7 +215,9 @@ class NewsAggregator:
             return []
 
         def fetch(article: Article) -> Article:
-            article.content = self.content_extractor.get_content(article.url, article.content)
+            article.content = self.content_extractor.get_content(
+                article.url, article.content
+            )
             return article
 
         enriched = []
@@ -277,15 +291,21 @@ class NewsAggregator:
 
         def summarise_one(pair):
             article, article_id = pair
-            summary = self.summarizer.summarize(article.content, article.title, article.topics)
+            summary = self.summarizer.summarize(
+                article.content, article.title, article.topics
+            )
             if summary and self.store and article_id:
                 self.store.update_article(article_id, {"last_summary": summary})
             return article.url, summary
 
         summaries = {}
         results = []
-        with ThreadPoolExecutor(max_workers=self.max_concurrent_summarizations) as executor:
-            futures = {executor.submit(summarise_one, pair): pair for pair in new_articles}
+        with ThreadPoolExecutor(
+            max_workers=self.max_concurrent_summarizations
+        ) as executor:
+            futures = {
+                executor.submit(summarise_one, pair): pair for pair in new_articles
+            }
             for future in as_completed(futures):
                 try:
                     results.append(future.result())
