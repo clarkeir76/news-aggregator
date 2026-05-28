@@ -36,6 +36,7 @@ class Config:
         self.max_articles_per_feed = int(os.getenv("MAX_ARTICLES_PER_FEED", "50"))
         self.max_summary_length = int(os.getenv("MAX_SUMMARY_LENGTH", "300"))
         self.max_concurrent_feeds = int(os.getenv("MAX_CONCURRENT_FEEDS", "10"))
+        self.feed_timeout = int(os.getenv("FEED_TIMEOUT", "20"))
         self.max_concurrent_summarizations = int(os.getenv("MAX_CONCURRENT_SUMMARIZATIONS", "5"))
         self.max_article_age_hours = int(os.getenv("MAX_ARTICLE_AGE_HOURS", "24"))
         self.last_run_file = os.getenv("LAST_RUN_FILE", "config/.last_run")

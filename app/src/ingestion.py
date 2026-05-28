@@ -71,7 +71,8 @@ class RSSIngester:
             if feed.bozo:
                 logger.warning(f"Feed parse warning for {feed_url}: {feed.bozo_exception}")
 
-            for i, entry in enumerate(feed.entries[: self.max_articles_per_feed]):
+            entries = feed.entries[: self.max_articles_per_feed]
+            for i, entry in enumerate(entries):
                 try:
                     article = self._parse_entry(entry, feed_url)
                     if article:
@@ -80,11 +81,19 @@ class RSSIngester:
                     logger.warning(f"Error parsing entry {i} from {feed_url}: {e}")
                     errors += 1
 
+            filtered = len(entries) - len(articles) - errors
+            if filtered > 0:
+                logger.info(
+                    f"Ingested {len(articles)}/{len(entries)} articles from {feed_url} "
+                    f"({filtered} age-filtered, {errors} errors)"
+                )
+            else:
+                logger.info(f"Ingested {len(articles)} articles from {feed_url} ({errors} errors)")
+
         except Exception as e:
             logger.error(f"Failed to fetch feed {feed_url}: {e}")
             errors += 1
-
-        logger.info(f"Ingested {len(articles)} articles from {feed_url} ({errors} errors)")
+            logger.info(f"Ingested 0 articles from {feed_url} (1 errors)")
         return articles, errors
 
     def ingest_feeds(self, feed_configs: List[FeedConfig]) -> Tuple[List[Article], dict]:

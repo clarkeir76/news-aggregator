@@ -47,6 +47,7 @@ class NewsAggregator:
         max_articles_per_feed: int = 50,
         max_concurrent_feeds: int = 10,
         max_concurrent_summarizations: int = 5,
+        feed_timeout: int = 20,
         max_article_age_hours: int = 24,
         last_run_file: str = "logs/.last_run",
     ):
@@ -71,6 +72,7 @@ class NewsAggregator:
         self.ingester = RSSIngester(
             max_articles_per_feed=max_articles_per_feed,
             max_concurrent_feeds=max_concurrent_feeds,
+            timeout=feed_timeout,
             cutoff=cutoff,
         )
 

@@ -56,6 +56,7 @@ def lambda_handler(event, context):
             enable_llm_classification=config.enable_llm_classification,
             max_articles_per_feed=config.max_articles_per_feed,
             max_concurrent_feeds=config.max_concurrent_feeds,
+            feed_timeout=config.feed_timeout,
             max_concurrent_summarizations=config.max_concurrent_summarizations,
             max_article_age_hours=config.max_article_age_hours,
             last_run_file=config.last_run_file,
