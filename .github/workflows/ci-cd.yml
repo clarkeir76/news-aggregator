@@ -61,6 +61,7 @@ jobs:
   terraform-validate:
     name: Terraform Validate
     runs-on: ubuntu-latest
+    if: vars.DEPLOY_ENABLED == 'true'
 
     steps:
       - uses: actions/checkout@v4
