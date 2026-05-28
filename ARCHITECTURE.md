@@ -20,7 +20,7 @@ EventBridge Scheduler
         │
         ├── OpenAI API (summarisation)
         │
-        └── Slack Incoming Webhooks — Block Kit (one digest per topic channel)
+        └── Slack Workflow Webhooks (one plain text digest per topic channel)
 ```
 
 ## Pipeline
@@ -64,7 +64,7 @@ New articles are summarised concurrently (`MAX_CONCURRENT_SUMMARIZATIONS`, defau
 
 ### Step 7: Slack Digests
 
-One Block Kit message per topic channel via Slack Incoming Webhooks. Each message contains all new articles for that topic with a bold linked title, summary, and source/date. Link previews are disabled (`unfurl_links: false`, `unfurl_media: false`). Controlled by `ENABLE_SLACK` (`true` / `false` / `log`).
+One plain text message per topic channel via Slack Workflow Builder webhooks. Each message is sent as a `payload` string variable containing title, clickable URL, summary, and source/date for each article. Controlled by `ENABLE_SLACK` (`true` / `false` / `log`).
 
 ## DynamoDB Schema
 

@@ -29,18 +29,15 @@ def notifier():
 # --- _build_digest ---
 
 
-def test_build_digest_is_block_kit(article):
+def test_build_digest_uses_payload_key(article):
     message = SlackNotifier._build_digest("tech", [article], {})
-    assert "blocks" in message
-    assert message["unfurl_links"] is False
-    assert message["unfurl_media"] is False
+    assert "payload" in message
 
 
 def test_build_digest_contains_topic_and_count(article):
-    blocks = SlackNotifier._build_digest("tech", [article], {})["blocks"]
-    header_text = blocks[0]["text"]["text"]
-    assert "Tech Digest" in header_text
-    assert "1 new article" in header_text
+    payload = SlackNotifier._build_digest("tech", [article], {})["payload"]
+    assert "Tech Digest" in payload
+    assert "1 new article" in payload
 
 
 def test_build_digest_singular_vs_plural():
@@ -55,52 +52,26 @@ def test_build_digest_singular_vs_plural():
         )
         for i in range(3)
     ]
-    blocks = SlackNotifier._build_digest("tech", articles, {})["blocks"]
-    assert "3 new articles" in blocks[0]["text"]["text"]
+    payload = SlackNotifier._build_digest("tech", articles, {})["payload"]
+    assert "3 new articles" in payload
 
 
-def test_build_digest_includes_article_title_and_url(article):
-    blocks = SlackNotifier._build_digest("tech", [article], {})["blocks"]
-    article_block = next(
-        b
-        for b in blocks
-        if b["type"] == "section" and article.title in b["text"]["text"]
-    )  # noqa: E501
-    assert article.url in article_block["text"]["text"]
-    assert article.title in article_block["text"]["text"]
-
-
-def test_build_digest_title_is_bold_link(article):
-    blocks = SlackNotifier._build_digest("tech", [article], {})["blocks"]
-    article_block = next(
-        b
-        for b in blocks
-        if b["type"] == "section" and article.title in b["text"]["text"]
-    )  # noqa: E501
-    assert f"*<{article.url}|{article.title}>*" in article_block["text"]["text"]
+def test_build_digest_includes_title_and_url(article):
+    payload = SlackNotifier._build_digest("tech", [article], {})["payload"]
+    assert article.title in payload
+    assert article.url in payload
 
 
 def test_build_digest_includes_summary(article):
     summaries = {article.url: "A concise summary."}
-    blocks = SlackNotifier._build_digest("tech", [article], summaries)["blocks"]
-    article_block = next(
-        b
-        for b in blocks
-        if b["type"] == "section" and article.title in b["text"]["text"]
-    )  # noqa: E501
-    assert "A concise summary." in article_block["text"]["text"]
+    payload = SlackNotifier._build_digest("tech", [article], summaries)["payload"]
+    assert "A concise summary." in payload
 
 
 def test_build_digest_source_is_below_summary(article):
     summaries = {article.url: "A concise summary."}
-    blocks = SlackNotifier._build_digest("tech", [article], summaries)["blocks"]
-    article_block = next(
-        b
-        for b in blocks
-        if b["type"] == "section" and article.title in b["text"]["text"]
-    )  # noqa: E501
-    text = article_block["text"]["text"]
-    assert text.index("A concise summary.") < text.index("source:")
+    payload = SlackNotifier._build_digest("tech", [article], summaries)["payload"]
+    assert payload.index("A concise summary.") < payload.index("source:")
 
 
 def test_build_digest_topic_label_formats_underscore():
@@ -112,8 +83,8 @@ def test_build_digest_topic_label_formats_underscore():
         content="x",
         topics=["cyber_security"],
     )
-    blocks = SlackNotifier._build_digest("cyber_security", [article], {})["blocks"]
-    assert "Cyber Security Digest" in blocks[0]["text"]["text"]
+    payload = SlackNotifier._build_digest("cyber_security", [article], {})["payload"]
+    assert "Cyber Security Digest" in payload
 
 
 # --- notify_digest ---

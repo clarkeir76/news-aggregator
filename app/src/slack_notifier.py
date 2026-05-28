@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class SlackNotifier:
-    """Send digest messages to Slack via incoming webhooks using Block Kit."""
+    """Send digest messages to Slack via webhooks."""
 
     def __init__(self, webhook_urls: dict, dry_run: bool = False):
         self.webhook_urls = webhook_urls
@@ -39,11 +39,7 @@ class SlackNotifier:
         for topic, topic_articles in by_topic.items():
             message = self._build_digest(topic, topic_articles, summaries)
             if self.dry_run:
-                import json
-
-                logger.info(
-                    f"[DRY RUN] Digest for #{topic}:\n{json.dumps(message, indent=2)}\n"
-                )
+                logger.info(f"[DRY RUN] Digest for #{topic}:\n{message['payload']}\n")
             elif not self._send_webhook(self.webhook_urls[topic], message):
                 success = False
 
@@ -51,46 +47,29 @@ class SlackNotifier:
 
     @staticmethod
     def _build_digest(topic: str, articles: List[Article], summaries: dict) -> dict:
-        """Build a Slack Block Kit message for one topic digest."""
+        """Build a plain text payload for a Slack Workflow Builder webhook."""
         count = len(articles)
         noun = "article" if count == 1 else "articles"
         topic_label = topic.replace("_", " ").title()
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-        blocks = [
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f":newspaper: *{topic_label} Digest — {count} new {noun}* | {timestamp}",  # noqa: E501
-                },
-            },
-            {"type": "divider"},
-        ]
+        lines = [f":newspaper: {topic_label} Digest — {count} new {noun} | {timestamp}"]
 
         for article in articles:
-            text = f"*<{article.url}|{article.title}>*"
+            lines.append(f"\n{article.title}")
+            lines.append(article.url)
             summary = summaries.get(article.url)
             if summary:
-                text += f"\n{summary}"
-            text += f"\nsource: {article.source} | {article.published_at.strftime('%Y-%m-%d %H:%M UTC')}"  # noqa: E501
-
-            blocks.append(
-                {
-                    "type": "section",
-                    "text": {"type": "mrkdwn", "text": text},
-                }
+                lines.append(summary)
+            lines.append(
+                f"source: {article.source} | {article.published_at.strftime('%Y-%m-%d %H:%M UTC')}"  # noqa: E501
             )
 
-        return {
-            "unfurl_links": False,
-            "unfurl_media": False,
-            "blocks": blocks,
-        }
+        return {"payload": "\n".join(lines)}
 
     @staticmethod
     def _send_webhook(webhook_url: str, message: dict) -> bool:
-        """Send message to Slack incoming webhook"""
+        """Send message to Slack webhook"""
         try:
             response = requests.post(webhook_url, json=message, timeout=10)
 
