@@ -123,6 +123,7 @@ fetched_at       When this version was fetched
 | `LOG_FILE` | Write logs to file (local only) | `logs/run.log` |
 | `MAX_ARTICLES_PER_FEED` | Articles fetched per feed per run | `50` |
 | `MAX_CONCURRENT_FEEDS` | Parallel feed/article fetches | `10` |
+| `FEED_TIMEOUT` | Seconds to wait for each feed HTTP request | `20` |
 | `MAX_CONCURRENT_SUMMARIZATIONS` | Parallel OpenAI summarisation calls | `5` |
 | `MAX_ARTICLE_AGE_HOURS` | Discard articles older than this (0 = disabled) | `24` |
 | `LAST_RUN_FILE` | Path to last run timestamp file | `logs/.last_run` |

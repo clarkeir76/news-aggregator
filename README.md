@@ -89,6 +89,7 @@ python app/lambda_handler.py
 | `MAX_ARTICLES_PER_FEED` | Articles fetched per RSS feed per run | `50` |
 | `MAX_SUMMARY_LENGTH` | Max summary length in tokens | `300` |
 | `MAX_CONCURRENT_FEEDS` | Number of feeds/article fetches in parallel | `10` |
+| `FEED_TIMEOUT` | Seconds to wait for each feed HTTP request | `20` |
 | `MAX_CONCURRENT_SUMMARIZATIONS` | Number of parallel OpenAI summarisation calls | `5` |
 | `MAX_ARTICLE_AGE_HOURS` | Discard articles older than this. Set to `0` to disable. | `24` |
 | `LAST_RUN_FILE` | Path to file storing last successful run timestamp | `logs/.last_run` |
