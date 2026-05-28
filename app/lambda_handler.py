@@ -52,6 +52,7 @@ def lambda_handler(event, context):
             enable_slack=config.enable_slack,
             slack_dry_run=config.slack_dry_run,
             enable_persistence=config.enable_persistence,
+            enable_llm_classification=config.enable_llm_classification,
             max_articles_per_feed=config.max_articles_per_feed,
             max_concurrent_feeds=config.max_concurrent_feeds,
         )

@@ -25,113 +25,124 @@ def feed_config_file(tmp_path):
     return str(config)
 
 
+def make_aggregator(feed_config_file, **kwargs):
+    defaults = dict(
+        feed_config_path=feed_config_file,
+        enable_persistence=False,
+        enable_slack=False,
+        enable_summarization=False,
+        enable_llm_classification=False,
+        max_concurrent_feeds=1,
+    )
+    defaults.update(kwargs)
+    return NewsAggregator(**defaults)
+
+
 # --- Initialisation ---
 
 def test_no_store_when_persistence_disabled(feed_config_file):
-    aggregator = NewsAggregator(
-        feed_config_path=feed_config_file,
-        enable_persistence=False,
-        max_concurrent_feeds=1,
-    )
-    assert aggregator.store is None
+    assert make_aggregator(feed_config_file).store is None
 
 
 def test_no_notifier_when_slack_disabled(feed_config_file):
-    aggregator = NewsAggregator(feed_config_path=feed_config_file, enable_slack=False)
-    assert aggregator.notifier is None
+    assert make_aggregator(feed_config_file).notifier is None
 
 
-def test_no_notifier_when_no_webhooks_provided(feed_config_file):
-    aggregator = NewsAggregator(feed_config_path=feed_config_file, enable_slack=True, slack_webhooks=None)
-    assert aggregator.notifier is None
+def test_no_notifier_when_no_webhooks(feed_config_file):
+    assert make_aggregator(feed_config_file, enable_slack=True, slack_webhooks=None).notifier is None
 
 
-def test_no_summarizer_when_summarization_disabled(feed_config_file):
-    aggregator = NewsAggregator(
-        feed_config_path=feed_config_file,
-        enable_summarization=False,
-        openai_api_key="key",
-    )
-    assert aggregator.summarizer is None
+def test_no_summarizer_when_disabled(feed_config_file):
+    assert make_aggregator(feed_config_file, enable_summarization=False, openai_api_key="key").summarizer is None
 
 
-def test_no_summarizer_when_no_api_key(feed_config_file):
-    aggregator = NewsAggregator(
-        feed_config_path=feed_config_file,
-        enable_summarization=True,
-        openai_api_key=None,
-    )
-    assert aggregator.summarizer is None
+def test_no_summarizer_when_no_key(feed_config_file):
+    assert make_aggregator(feed_config_file, enable_summarization=True, openai_api_key=None).summarizer is None
 
 
 def test_notifier_created_when_slack_enabled(feed_config_file):
-    aggregator = NewsAggregator(
-        feed_config_path=feed_config_file,
-        enable_slack=True,
-        slack_webhooks={"tech": "https://hooks.slack.com/x"},
-    )
-    assert aggregator.notifier is not None
+    agg = make_aggregator(feed_config_file, enable_slack=True, slack_webhooks={"tech": "https://x"})
+    assert agg.notifier is not None
+
+
+def test_uses_llm_classifier_when_enabled_with_key(feed_config_file, mocker):
+    from unittest.mock import MagicMock
+    mocker.patch("app.src.classification.openai.OpenAI", return_value=MagicMock())
+    agg = make_aggregator(feed_config_file, enable_llm_classification=True, openai_api_key="key")
+    from app.src.classification import LLMClassifier
+    assert isinstance(agg.classifier, LLMClassifier)
+
+
+def test_uses_keyword_classifier_when_llm_disabled(feed_config_file):
+    from app.src.classification import KeywordClassifier
+    agg = make_aggregator(feed_config_file, enable_llm_classification=False)
+    assert isinstance(agg.classifier, KeywordClassifier)
 
 
 # --- Pipeline ---
 
 def test_run_returns_stats(mocker, feed_config_file, article):
-    aggregator = NewsAggregator(
-        feed_config_path=feed_config_file,
-        enable_persistence=False,
-        enable_slack=False,
-        enable_summarization=False,
-    )
-    mocker.patch.object(aggregator.ingester, "ingest_feeds", return_value=(
+    agg = make_aggregator(feed_config_file)
+    mocker.patch.object(agg.ingester, "ingest_feeds", return_value=(
         [article],
         {"total_feeds": 1, "successful_feeds": 1, "failed_feeds": 0, "total_articles": 1, "total_errors": 0},
     ))
-    mocker.patch.object(aggregator.classifier, "classify_articles", return_value=[article])
-    mocker.patch.object(aggregator.deduplicator, "deduplicate", return_value=(
+    mocker.patch.object(agg.classifier, "classify_and_filter", return_value=[article])
+    mocker.patch.object(agg, "_enrich_content", return_value=[article])
+    mocker.patch.object(agg.deduplicator, "deduplicate", return_value=(
         [article],
         {"total_input": 1, "url_duplicates": 0, "content_hash_duplicates": 0, "title_fuzzy_duplicates": 0, "unique_output": 1},
     ))
 
-    stats = aggregator.run()
-
+    stats = agg.run()
     assert stats["errors"] == []
-    assert stats["unique_output"] == 1
+    assert stats["articles_classified"] == 1
 
 
-def test_run_handles_pipeline_error_gracefully(mocker, feed_config_file):
-    aggregator = NewsAggregator(
-        feed_config_path=feed_config_file,
-        enable_persistence=False,
-        enable_slack=False,
-        enable_summarization=False,
-    )
-    mocker.patch.object(aggregator.ingester, "ingest_feeds", side_effect=RuntimeError("feed error"))
+def test_run_handles_pipeline_error(mocker, feed_config_file):
+    agg = make_aggregator(feed_config_file)
+    mocker.patch.object(agg.ingester, "ingest_feeds", side_effect=RuntimeError("feed error"))
 
-    stats = aggregator.run()
-
+    stats = agg.run()
     assert len(stats["errors"]) == 1
     assert "feed error" in stats["errors"][0]
 
 
 def test_run_skips_slack_when_no_new_articles(mocker, feed_config_file):
-    aggregator = NewsAggregator(
-        feed_config_path=feed_config_file,
-        enable_persistence=False,
+    agg = make_aggregator(
+        feed_config_file,
         enable_slack=True,
-        slack_webhooks={"tech": "https://hooks.slack.com/x"},
-        enable_summarization=False,
+        slack_webhooks={"tech": "https://x"},
     )
-    mocker.patch.object(aggregator.ingester, "ingest_feeds", return_value=(
-        [],
-        {"total_feeds": 1, "successful_feeds": 1, "failed_feeds": 0, "total_articles": 0, "total_errors": 0},
+    mocker.patch.object(agg.ingester, "ingest_feeds", return_value=(
+        [], {"total_feeds": 1, "successful_feeds": 0, "failed_feeds": 1, "total_articles": 0, "total_errors": 0},
     ))
-    mocker.patch.object(aggregator.classifier, "classify_articles", return_value=[])
-    mocker.patch.object(aggregator.deduplicator, "deduplicate", return_value=(
-        [],
-        {"total_input": 0, "url_duplicates": 0, "content_hash_duplicates": 0, "title_fuzzy_duplicates": 0, "unique_output": 0},
+    mocker.patch.object(agg.classifier, "classify_and_filter", return_value=[])
+    mocker.patch.object(agg, "_enrich_content", return_value=[])
+    mocker.patch.object(agg.deduplicator, "deduplicate", return_value=(
+        [], {"total_input": 0, "url_duplicates": 0, "content_hash_duplicates": 0, "title_fuzzy_duplicates": 0, "unique_output": 0},
     ))
-    mock_notify = mocker.patch.object(aggregator.notifier, "notify_digest")
+    mock_notify = mocker.patch.object(agg.notifier, "notify_digest")
 
-    aggregator.run()
-
+    agg.run()
     mock_notify.assert_not_called()
+
+
+def test_enrich_content_fetches_for_all_articles(mocker, feed_config_file, article):
+    agg = make_aggregator(feed_config_file)
+    mocker.patch.object(agg.content_extractor, "get_content", return_value="Full article text")
+
+    result = agg._enrich_content([article])
+
+    assert len(result) == 1
+    assert result[0].content == "Full article text"
+
+
+def test_enrich_content_handles_fetch_failure(mocker, feed_config_file, article):
+    agg = make_aggregator(feed_config_file)
+    mocker.patch.object(agg.content_extractor, "get_content", side_effect=Exception("fetch failed"))
+
+    result = agg._enrich_content([article])
+
+    assert len(result) == 1
+    assert result[0].url == article.url

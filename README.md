@@ -7,9 +7,11 @@ A Python news aggregation and summarisation system that pulls articles from mult
 ```
 RSS Feeds
    ↓
-[Ingestion] — fetch articles, fall back to fetching full article text if RSS is too short
+[Ingestion] — fetch feeds concurrently, store title + RSS summary only (fast)
    ↓
-[Classification] — keyword-based topic matching (tech / ai / cyber_security / education)
+[Classification] — LLM batch call classifies all articles at once, discards non-matches
+   ↓
+[Content Enrichment] — fetch full article text concurrently (only for matched articles)
    ↓
 [Deduplication] — exact URL, content hash, fuzzy title (85%+ similarity)
    ↓
@@ -19,6 +21,11 @@ RSS Feeds
    ↓
 [Slack] — one digest message per topic channel per run
 ```
+
+The pipeline is ordered to minimise expensive operations: RSS fetching is fast, so all
+feeds are ingested first. The LLM then discards irrelevant articles in a single batch
+API call before any full article text is fetched — avoiding slow HTTP requests for news
+that would be thrown away anyway.
 
 ### AWS Architecture
 
@@ -76,6 +83,7 @@ python app/lambda_handler.py
 | `ENABLE_SLACK` | Slack mode: `true` / `false` / `log` | `true` |
 | `ENABLE_SUMMARIZATION` | Enable OpenAI summarisation | `true` |
 | `ENABLE_PERSISTENCE` | Enable DynamoDB storage | `true` |
+| `ENABLE_LLM_CLASSIFICATION` | Use LLM to classify and filter articles (falls back to keywords if disabled or no API key) | `true` |
 | `FEED_CONFIG_PATH` | Path to feeds.yaml | resolved relative to lambda_handler.py |
 | `LOG_LEVEL` | Logging level | `INFO` |
 | `MAX_ARTICLES_PER_FEED` | Articles fetched per RSS feed per run | `50` |

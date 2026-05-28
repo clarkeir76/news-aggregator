@@ -1,4 +1,5 @@
-"""RSS feed ingestion module"""
+"""RSS feed ingestion module — fetches feeds and extracts RSS-provided content only.
+Full article text is fetched separately after classification."""
 
 import logging
 import socket
@@ -10,7 +11,6 @@ from urllib.parse import urlparse
 import yaml
 
 from .models import Article
-from .content_extractor import ContentExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +23,9 @@ class FeedConfig:
 
     @classmethod
     def load_from_yaml(cls, config_path: str) -> List["FeedConfig"]:
-        """Load feeds configuration from YAML file"""
         try:
             with open(config_path, "r") as f:
                 config = yaml.safe_load(f)
-
             return [cls(url=feed_item.get("url")) for feed_item in config.get("feeds", [])]
         except FileNotFoundError:
             logger.error(f"Feed config file not found: {config_path}")
@@ -38,7 +36,7 @@ class FeedConfig:
 
 
 class RSSIngester:
-    """RSS feed ingestion"""
+    """RSS feed ingestion — stores RSS-provided title and summary only."""
 
     def __init__(
         self,
@@ -49,15 +47,8 @@ class RSSIngester:
         self.max_articles_per_feed = max_articles_per_feed
         self.timeout = timeout
         self.max_concurrent_feeds = max_concurrent_feeds
-        self.extractor = ContentExtractor(fetch_timeout=timeout)
 
     def ingest_feed(self, feed_url: str) -> Tuple[List[Article], int]:
-        """
-        Ingest a single RSS feed.
-
-        Returns:
-            Tuple of (articles, error_count)
-        """
         articles = []
         errors = 0
 
@@ -95,12 +86,6 @@ class RSSIngester:
         return articles, errors
 
     def ingest_feeds(self, feed_configs: List[FeedConfig]) -> Tuple[List[Article], dict]:
-        """
-        Ingest multiple RSS feeds concurrently.
-
-        Returns:
-            Tuple of (articles, stats)
-        """
         stats = {
             "total_feeds": len(feed_configs),
             "successful_feeds": 0,
@@ -108,7 +93,6 @@ class RSSIngester:
             "total_articles": 0,
             "total_errors": 0,
         }
-
         all_articles = []
 
         with ThreadPoolExecutor(max_workers=self.max_concurrent_feeds) as executor:
@@ -127,8 +111,9 @@ class RSSIngester:
 
         return all_articles, stats
 
-    def _parse_entry(self, entry: dict, feed_url: str) -> Optional[Article]:
-        """Parse a single feed entry into an Article, fetching full text if needed."""
+    @staticmethod
+    def _parse_entry(entry: dict, feed_url: str) -> Optional[Article]:
+        """Parse a feed entry — stores RSS title and summary only, no HTTP fetching."""
         try:
             title = entry.get("title", "").strip()
             if not title:
@@ -138,9 +123,8 @@ class RSSIngester:
             if not url:
                 return None
 
-            published_at = self._parse_date(entry)
-            rss_content = self._extract_rss_content(entry)
-            content = self.extractor.get_content(url, rss_content)
+            published_at = RSSIngester._parse_date(entry)
+            content = RSSIngester._extract_rss_content(entry)
             source = urlparse(feed_url).netloc
 
             return Article(
@@ -157,7 +141,6 @@ class RSSIngester:
 
     @staticmethod
     def _parse_date(entry: dict) -> datetime:
-        """Extract published date from feed entry, falling back to now."""
         if entry.get("published_parsed"):
             try:
                 return datetime(*entry.get("published_parsed")[:6])
@@ -172,7 +155,6 @@ class RSSIngester:
 
     @staticmethod
     def _extract_rss_content(entry: dict) -> str:
-        """Pull whatever text the RSS entry provides."""
         content_list = entry.get("content")
         if content_list:
             return content_list[0].value or ""

@@ -85,7 +85,6 @@ def test_ingest_feed_returns_articles(mocker):
         "published_parsed": (2024, 1, 15, 10, 0, 0, 0, 0, 0),
     }]
     mocker.patch("app.src.ingestion.feedparser.parse", return_value=mock_feed)
-    mocker.patch("app.src.content_extractor.trafilatura.fetch_url", return_value=None)
 
     ingester = RSSIngester()
     articles, errors = ingester.ingest_feed("https://example.com/rss")
@@ -126,7 +125,6 @@ def test_ingest_feed_skips_entries_without_title(mocker):
         {"title": "Valid Article", "link": "https://example.com/2", "summary": "A" * 250},
     ]
     mocker.patch("app.src.ingestion.feedparser.parse", return_value=mock_feed)
-    mocker.patch("app.src.content_extractor.trafilatura.fetch_url", return_value=None)
 
     ingester = RSSIngester()
     articles, errors = ingester.ingest_feed("https://example.com/rss")

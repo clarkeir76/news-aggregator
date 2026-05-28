@@ -30,6 +30,7 @@ class Config:
         self.slack_dry_run = slack_mode == "log"
         self.enable_summarization = os.getenv("ENABLE_SUMMARIZATION", "true").lower() == "true"
         self.enable_persistence = os.getenv("ENABLE_PERSISTENCE", "true").lower() == "true"
+        self.enable_llm_classification = os.getenv("ENABLE_LLM_CLASSIFICATION", "true").lower() == "true"
 
         # Limits
         self.max_articles_per_feed = int(os.getenv("MAX_ARTICLES_PER_FEED", "50"))
