@@ -211,9 +211,9 @@ news-aggregator/
 │   ├── src/
 │   │   ├── config.py            # Environment variable loading
 │   │   ├── models.py            # Article / StoredArticle dataclasses
-│   │   ├── ingestion.py         # RSS feed fetching and parsing
+│   │   ├── ingestion.py         # RSS feed fetching (title + summary only)
+│   │   ├── classification.py    # LLMClassifier (primary) + KeywordClassifier (fallback)
 │   │   ├── content_extractor.py # Full article text extraction via trafilatura
-│   │   ├── classification.py    # Keyword-based topic classification
 │   │   ├── deduplication.py     # URL, hash and fuzzy-title deduplication
 │   │   ├── persistence.py       # DynamoDB read/write
 │   │   ├── summarization.py     # OpenAI summarisation

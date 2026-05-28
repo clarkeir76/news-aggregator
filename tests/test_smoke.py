@@ -30,6 +30,21 @@ def test_content_extractor_initializes():
     assert ContentExtractor() is not None
 
 
+def test_keyword_classifier_initializes():
+    from app.src.classification import KeywordClassifier
+    c = KeywordClassifier()
+    assert callable(c.classify)
+    assert callable(c.classify_and_filter)
+
+
+def test_llm_classifier_initializes():
+    """LLMClassifier must construct a real openai client without error."""
+    from app.src.classification import LLMClassifier
+    c = LLMClassifier(api_key="test-key")
+    assert c.client is not None
+    assert callable(c.classify_and_filter)
+
+
 def test_feedparser_parse_accepts_no_timeout_kwarg():
     """feedparser.parse() does not accept a timeout kwarg in v6 — must use socket."""
     import feedparser

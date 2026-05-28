@@ -18,15 +18,14 @@ from app.src.ingestion import FeedConfig
 
 configs = FeedConfig.load_from_yaml("config/feeds.yaml")
 for config in configs:
-    print(f"{config.url} -> {config.topics}")
+    print(config.url)
 ```
 
-#### `RSSIngester.ingest_feed(feed_url: str, topics: List[str]) -> Tuple[List[Article], int]`
-Ingest a single RSS feed.
+#### `RSSIngester.ingest_feed(feed_url: str) -> Tuple[List[Article], int]`
+Ingest a single RSS feed. Stores title and RSS summary only — full article text is fetched later by the orchestrator after classification.
 
 **Parameters**:
 - `feed_url` (str): URL of RSS feed
-- `topics` (List[str]): Topics to assign to articles
 
 **Returns**: Tuple of (articles, error_count)
 
@@ -34,11 +33,8 @@ Ingest a single RSS feed.
 
 **Example**:
 ```python
-ingester = RSSIngester(max_articles_per_feed=50)
-articles, errors = ingester.ingest_feed(
-    "https://news.ycombinator.com/rss",
-    ["tech"]
-)
+ingester = RSSIngester(max_articles_per_feed=50, max_concurrent_feeds=10)
+articles, errors = ingester.ingest_feed("https://news.ycombinator.com/rss")
 print(f"Got {len(articles)} articles with {errors} errors")
 ```
 
@@ -65,42 +61,36 @@ Ingest multiple RSS feeds.
 
 ### `classification.py` - Topic Classification
 
-#### `KeywordClassifier.classify(article: Article) -> List[str]`
-Classify an article into topics using keywords.
+Two classifiers are available, both implementing the `classify_and_filter` interface. `LLMClassifier` is used by default when an OpenAI API key is present; `KeywordClassifier` is the fallback.
+
+#### `LLMClassifier.classify_and_filter(articles: List[Article]) -> List[Article]`
+Classify and filter articles using a single batched LLM call. Discards articles that don't match any topic. Falls back to `KeywordClassifier` if the API call fails.
 
 **Parameters**:
-- `article` (Article): Article to classify
+- `articles` (List[Article]): Articles with title and RSS summary populated
 
-**Returns**: List of topic strings (e.g., ["tech", "ai"])
-
-**Logic**:
-1. If article already has topics (from feed config), return as-is
-2. Otherwise, search title and content for keywords
-3. Match one keyword per topic
-4. Default to "tech" if no match found
+**Returns**: Filtered list with `topics` set on each article
 
 **Example**:
 ```python
-classifier = KeywordClassifier()
-article = Article(
-    title="New AI Model Released",
-    source="openai.com",
-    url="https://openai.com/gpt5",
-    published_at=datetime.utcnow(),
-    content="OpenAI released GPT-5 with improved capabilities",
-    topics=[]
-)
-topics = classifier.classify(article)
-print(topics)  # ["ai"]
+classifier = LLMClassifier(api_key="sk-...")
+matched = classifier.classify_and_filter(articles)
+# matched contains only relevant articles, each with topics assigned
 ```
 
-#### `KeywordClassifier.classify_articles(articles: List[Article]) -> List[Article]`
-Classify multiple articles in-place.
+#### `KeywordClassifier.classify_and_filter(articles: List[Article]) -> List[Article]`
+Classify articles using keyword matching. Keeps all articles (no articles are discarded — keyword matching has no confidence in rejection).
 
 **Parameters**:
 - `articles` (List[Article]): Articles to classify
 
-**Returns**: Same list with topics populated
+**Returns**: All articles with `topics` set; defaults to `["tech"]` if no keywords match
+
+**Example**:
+```python
+classifier = KeywordClassifier()
+articles = classifier.classify_and_filter(articles)
+```
 
 ---
 
