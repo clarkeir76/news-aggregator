@@ -168,9 +168,16 @@ def test_topic_descriptions_contain_exclusion_criteria():
     """Topic descriptions must include explicit EXCLUDE guidance for tech and education."""
     from app.src.classification import TOPICS
 
-    assert "EXCLUDE" in TOPICS["tech"], "tech topic must have explicit exclusion criteria"
-    assert "EXCLUDE" in TOPICS["education"], "education topic must have explicit exclusion criteria"
-    assert "post-18" in TOPICS["education"].lower() or "post 18" in TOPICS["education"].lower()
+    assert (
+        "EXCLUDE" in TOPICS["tech"]
+    ), "tech topic must have explicit exclusion criteria"
+    assert (
+        "EXCLUDE" in TOPICS["education"]
+    ), "education topic must have explicit exclusion criteria"
+    assert (
+        "post-18" in TOPICS["education"].lower()
+        or "post 18" in TOPICS["education"].lower()
+    )
     assert "consumer" in TOPICS["tech"].lower()
 
 
