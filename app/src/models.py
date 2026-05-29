@@ -31,6 +31,9 @@ class Article:
     published_at: datetime
     content: str
     topics: List[str] = field(default_factory=list)
+    related_urls: List[str] = field(
+        default_factory=list
+    )  # other sources covering same story
     content_hash: Optional[str] = None
     canonical_url: Optional[str] = None
     fetched_at: datetime = field(default_factory=datetime.utcnow)

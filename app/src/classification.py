@@ -58,6 +58,69 @@ class LLMClassifier:
         self.model = model
         self._fallback = KeywordClassifier()
 
+    def cluster_stories(self, articles: List[Article]) -> List[Article]:
+        """
+        Group articles covering the same story. Returns a reduced list where
+        each cluster is represented by the article with the most content;
+        the other URLs are stored in article.related_urls.
+        """
+        if len(articles) <= 1:
+            return articles
+
+        try:
+            return self._cluster(articles)
+        except Exception as e:
+            logger.warning(f"Story clustering failed, skipping: {e}")
+            return articles
+
+    def _cluster(self, articles: List[Article]) -> List[Article]:
+        indexed = {str(i + 1): article for i, article in enumerate(articles)}
+        lines = [f"{num}. {article.title}" for num, article in indexed.items()]
+
+        prompt = f"""Group these news article titles by story. Articles covering the same event,
+announcement, or development should be in the same group. Different outlets covering the same
+story count as one group.
+
+Return JSON only: {{"groups": [[1, 4], [2], [3, 5, 6]]}}
+Each inner list contains article numbers that cover the same story.
+
+Titles:
+{chr(10).join(lines)}"""
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a news deduplication assistant. Respond with valid JSON only.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0,
+            response_format={"type": "json_object"},
+        )
+
+        result = json.loads(response.choices[0].message.content)
+        groups = result.get("groups", [])
+
+        merged = []
+        for group in groups:
+            members = [indexed[str(n)] for n in group if str(n) in indexed]
+            if not members:
+                continue
+            primary = max(members, key=lambda a: len(a.content or ""))
+            related = [a for a in members if a is not primary]
+            primary.related_urls = [a.url for a in related]
+            merged.append(primary)
+
+        clustered = len(articles) - len(merged)
+        if clustered > 0:
+            logger.info(
+                f"Story clustering: {len(articles)} articles → {len(merged)} stories "
+                f"({clustered} merged)"
+            )
+        return merged
+
     def classify_and_filter(self, articles: List[Article]) -> List[Article]:
         """
         Classify a batch of articles in one LLM call.

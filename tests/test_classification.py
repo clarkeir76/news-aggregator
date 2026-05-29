@@ -174,6 +174,52 @@ def test_topic_descriptions_contain_exclusion_criteria():
     assert "consumer" in TOPICS["tech"].lower()
 
 
+def test_cluster_stories_merges_same_story(mock_openai):
+    import json
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps({"groups": [[1, 2], [3]]})
+
+    articles = [
+        make_article("GreyVibe hackers use AI", url="https://a.com/1"),
+        make_article("Russia-linked GreyVibe uses ChatGPT", url="https://b.com/1"),
+        make_article("Unrelated story", url="https://c.com/1"),
+    ]
+    # Give second article more content so it becomes primary
+    articles[0].content = "short"
+    articles[1].content = "much longer content about the same story"
+
+    classifier = LLMClassifier(api_key="test-key")
+    result = classifier.cluster_stories(articles)
+
+    assert len(result) == 2
+    primary = next(a for a in result if "GreyVibe" in a.title or "Russia" in a.title)
+    assert len(primary.related_urls) == 1
+
+
+def test_cluster_stories_skips_on_failure(mock_openai):
+    mock_openai.chat.completions.create.side_effect = Exception("API error")
+
+    articles = [
+        make_article("Story A", url="https://a.com/1"),
+        make_article("Story B", url="https://b.com/1"),
+    ]
+    classifier = LLMClassifier(api_key="test-key")
+    result = classifier.cluster_stories(articles)
+
+    assert len(result) == 2  # unchanged on failure
+
+
+def test_cluster_stories_single_article_skips_llm(mock_openai):
+    articles = [make_article("Only one", url="https://a.com/1")]
+    classifier = LLMClassifier(api_key="test-key")
+    result = classifier.cluster_stories(articles)
+
+    assert len(result) == 1
+    mock_openai.chat.completions.create.assert_not_called()
+
+
 def test_llm_classifier_handles_empty_input(mock_openai):
     classifier = LLMClassifier(api_key="test-key")
     result = classifier.classify_and_filter([])

@@ -37,9 +37,11 @@ Articles older than the cutoff are discarded here before anything else runs. The
 
 This means hourly runs only process the last hour's articles. If the pipeline hasn't run for 3 days it still caps at 24 hours.
 
-### Step 2: LLM Classification and Filter
+### Step 2: LLM Classification, Filter and Story Clustering
 
 All article titles and summaries are sent to OpenAI in a **single batch API call**. The LLM returns topic assignments (`tech`, `ai`, `cyber_security`, `education`) and discards articles that don't match any topic (general news, sport, weather etc.).
+
+A second LLM call then **clusters same-story articles** — multiple outlets covering the same event are merged into one entry. The richest article (most content) becomes the primary; other URLs are stored as `related_urls`. Slack shows all source URLs under a single summary, labelled "multiple sources".
 
 If the LLM call fails, `KeywordClassifier` is used as a fallback. Both classifiers implement the same `classify_and_filter` interface.
 

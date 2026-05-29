@@ -141,10 +141,15 @@ class NewsAggregator:
             self.stats["articles_classified"] = len(articles)
             logger.info(f"{len(articles)} articles matched our topics")
 
-            # Step 3: Fetch full article text (matched articles only, concurrent)
+            # Step 3: Cluster same-story articles across sources
+            if hasattr(self.classifier, "cluster_stories"):
+                articles = self.classifier.cluster_stories(articles)
+                self.stats["articles_classified"] = len(articles)
+
+            # Step 4: Fetch full article text (matched articles only, concurrent)
             articles = self._enrich_content(articles)
 
-            # Step 4: Deduplicate
+            # Step 5: Deduplicate
             existing_articles = (
                 self.store.get_recent_articles(limit=1000) if self.store else []
             )
@@ -156,7 +161,7 @@ class NewsAggregator:
             )
             self.stats.update(dedup_stats)
 
-            # Step 5: Persist
+            # Step 6: Persist
             new_articles = []
             for article in unique_articles:
                 if self.store:

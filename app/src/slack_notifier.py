@@ -57,12 +57,15 @@ class SlackNotifier:
 
         for article in articles:
             lines.append(f"\n{article.title}")
-            lines.append(article.url)
+            all_urls = [article.url] + (article.related_urls or [])
+            for url in all_urls:
+                lines.append(url)
             summary = summaries.get(article.url)
             if summary:
                 lines.append(summary)
+            source = "multiple sources" if article.related_urls else article.source
             lines.append(
-                f"source: {article.source} | {article.published_at.strftime('%Y-%m-%d %H:%M UTC')}"  # noqa: E501
+                f"source: {source} | {article.published_at.strftime('%Y-%m-%d %H:%M UTC')}"
             )
 
         return {"payload": "\n".join(lines)}
