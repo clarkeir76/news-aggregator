@@ -137,10 +137,16 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Build Lambda package
+      - name: Build Lambda package (Amazon Linux compatible)
         run: |
           mkdir -p lambda_build
-          pip install -r requirements.txt -t lambda_build/ --quiet
+          # Use manylinux wheels so native packages (lxml, trafilatura) are
+          # compatible with Lambda's Amazon Linux 2 runtime
+          pip install -r requirements.txt -t lambda_build/ --quiet \
+            --platform manylinux2014_x86_64 \
+            --only-binary :all: \
+            --python-version 3.12 \
+            --implementation cp
           cp -r app lambda_build/
           cp -r config lambda_build/
           cd lambda_build && zip -r ../lambda_function.zip . -q
