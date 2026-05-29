@@ -103,8 +103,8 @@ fetched_at       When this version was fetched
 |---|---|---|
 | Lambda | Runs the pipeline | Python 3.12, 512MB, 5-min timeout |
 | EventBridge Scheduler | Triggers Lambda on schedule | Every hour (prod) |
-| DynamoDB | Article storage | PAY_PER_REQUEST, PITR in prod |
-| S3 | Lambda packages + Terraform state | Versioned, encrypted |
+| DynamoDB | Article storage | PAY_PER_REQUEST, PITR in prod, TTL 14 days |
+| S3 | Lambda packages + Terraform state | Versioned, encrypted, lambda packages expire after 30 days |
 | CloudWatch | Logs and metrics | JSON-structured logs |
 
 Resource names follow the pattern `news-aggregator-{environment}` so prod, dev, and ephemeral test environments coexist without collision.

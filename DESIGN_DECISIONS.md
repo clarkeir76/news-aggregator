@@ -82,6 +82,12 @@ Key decisions and the reasoning behind them.
 
 ---
 
+## Data retention
+
+**DynamoDB TTL**: Articles are automatically deleted 14 days after they are saved, via DynamoDB's TTL feature (`expiration_time` Unix timestamp). This prevents unbounded growth while keeping enough history for deduplication across a typical working week. Articles older than 14 days would never be surfaced as "new" anyway given `MAX_ARTICLE_AGE_HOURS=60`.
+
+**S3 Lambda packages**: Each CI run uploads a new Lambda package under `lambda-packages/{run-id}/`. An S3 lifecycle policy expires these objects after 30 days. Terraform state files are unaffected — they have no expiry.
+
 ## DynamoDB partition key conventions
 
 Article records use `pk = ARTICLE#{uuid}`, system records use `pk = SYSTEM#config`. The `get_recent_articles()` scan filters to `ARTICLE#` keys only — this prevents system records (e.g. `last_run` timestamps) from being passed to `StoredArticle.from_dict()` and crashing.

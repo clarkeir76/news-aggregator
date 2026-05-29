@@ -85,6 +85,19 @@ def test_save_article_sets_gsi_keys(store, mock_table, article):
     assert item["source_date_gsi_pk"] == f"SOURCE#{article.source}"
 
 
+def test_save_article_sets_ttl(store, mock_table, article):
+    import time
+
+    mock_table.put_item.return_value = {}
+    store.save_article(article)
+
+    item = mock_table.put_item.call_args[1]["Item"]
+    assert "expiration_time" in item
+    # Should expire roughly 14 days from now
+    days_14 = 14 * 24 * 60 * 60
+    assert abs(item["expiration_time"] - (int(time.time()) + days_14)) < 60
+
+
 def test_save_article_returns_none_on_error(store, mock_table, article):
     mock_table.put_item.side_effect = ClientError(
         {"Error": {"Code": "500", "Message": "error"}}, "put_item"

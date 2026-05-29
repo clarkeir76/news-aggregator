@@ -1,9 +1,10 @@
 """DynamoDB persistence module"""
 
 import logging
+import time
 import uuid
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 import boto3
 from botocore.exceptions import ClientError
 
@@ -45,6 +46,11 @@ class DynamoDBStore:
             item["url_gsi_pk"] = f"URL#{article.url}"
             item["source_date_gsi_pk"] = f"SOURCE#{article.source}"
             item["source_date_gsi_sk"] = f"DATE#{article.published_at.isoformat()}"
+
+            # TTL — DynamoDB auto-deletes articles older than 14 days
+            item["expiration_time"] = int(time.time()) + int(
+                timedelta(days=14).total_seconds()
+            )
 
             self.table.put_item(Item=item)
             logger.info(f"Saved article: {article_id}")

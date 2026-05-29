@@ -25,6 +25,12 @@ resource "aws_dynamodb_table" "articles" {
     projection_type = "ALL"
   }
 
+  # TTL — DynamoDB auto-deletes articles when expiration_time passes
+  ttl {
+    attribute_name = "expiration_time"
+    enabled        = true
+  }
+
   # Point-in-time recovery for prod only
   point_in_time_recovery {
     enabled = var.environment == "prod"
