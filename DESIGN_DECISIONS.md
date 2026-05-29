@@ -14,6 +14,12 @@ Key decisions and the reasoning behind them.
 
 ---
 
+## LLM classification with reader-specific criteria
+
+**Decision**: The classification prompt includes explicit include/exclude criteria per topic, calibrated for a UK software engineering leader in the post-18 education sector. Topic descriptions define not just what to include but what to actively exclude (e.g. consumer tech deals for `tech`, primary school stories for `education`). The system prompt identifies the reader role so the LLM can make relevance judgements at the right level.
+
+**Why**: Generic topic descriptions (e.g. "technology, software, startups") produce too many irrelevant articles (consumer gadget deals, gaming, school disaster stories). Explicit exclusion criteria significantly improve signal-to-noise without needing per-feed topic pre-assignment.
+
 ## LLM classification with keyword fallback
 
 **Decision**: `LLMClassifier` is the default. `KeywordClassifier` is used as a fallback when the API call fails, or when `ENABLE_LLM_CLASSIFICATION=false`.

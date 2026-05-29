@@ -164,6 +164,16 @@ def test_llm_classifier_falls_back_to_keywords_on_failure(mock_openai):
     assert "cyber_security" in result[0].topics
 
 
+def test_topic_descriptions_contain_exclusion_criteria():
+    """Topic descriptions must include explicit EXCLUDE guidance for tech and education."""
+    from app.src.classification import TOPICS
+
+    assert "EXCLUDE" in TOPICS["tech"], "tech topic must have explicit exclusion criteria"
+    assert "EXCLUDE" in TOPICS["education"], "education topic must have explicit exclusion criteria"
+    assert "post-18" in TOPICS["education"].lower() or "post 18" in TOPICS["education"].lower()
+    assert "consumer" in TOPICS["tech"].lower()
+
+
 def test_llm_classifier_handles_empty_input(mock_openai):
     classifier = LLMClassifier(api_key="test-key")
     result = classifier.classify_and_filter([])

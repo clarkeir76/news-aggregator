@@ -13,10 +13,37 @@ logger = logging.getLogger(__name__)
 CLASSIFICATION_BATCH_SIZE = 50
 
 TOPICS = {
-    Topic.AI.value: "artificial intelligence, machine learning, LLMs, generative AI, AI research, AI products and companies",  # noqa: E501
-    Topic.TECH.value: "technology, software, startups, programming, cloud, hardware, developer tools (not specifically AI)",  # noqa: E501
-    Topic.CYBER_SECURITY.value: "security breaches, vulnerabilities, hacking, malware, ransomware, privacy, cybercrime",  # noqa: E501
-    Topic.EDUCATION.value: "schools, universities, students, teaching, educational policy, EdTech, academic research",  # noqa: E501
+    Topic.AI.value: (
+        "Artificial intelligence and machine learning: LLMs, generative AI, AI research breakthroughs, "
+        "new AI products and tools, AI company news (OpenAI, Anthropic, Google DeepMind etc.), "
+        "AI regulation and policy, AI's impact on work and industries. "
+        "Cast a wide net — include most AI stories."
+    ),
+    Topic.TECH.value: (
+        "Technology news relevant to a software engineering leader: new developer tools and frameworks, "
+        "cloud platform updates, software engineering practices, startup launches and significant funding rounds, "
+        "technical innovations worth discussing at CTO or engineering manager level. "
+        "EXCLUDE: consumer product deals and discounts (e.g. '50% off TV'), gaming releases and reviews, "
+        "home entertainment, fitness gadgets, 'best buy' recommendations, and any story whose primary "
+        "angle is a price reduction or retail promotion rather than the technology itself."
+    ),
+    Topic.CYBER_SECURITY.value: (
+        "Cybersecurity news: data breaches, ransomware attacks, software vulnerabilities and patches, "
+        "hacking incidents, privacy violations, security policy and regulation, nation-state cyber activity. "
+        "Include most cybersecurity stories — cast a wide net."
+    ),
+    Topic.EDUCATION.value: (
+        "Post-18 education and skills in the UK and globally: university admissions and policy, degree programmes, "
+        "apprenticeships (especially UK levy-funded), professional qualifications and development, vocational training. "
+        "Government policy on higher education, skills funding, and apprenticeships. "
+        "Youth unemployment and the NEET issue (18-24 year olds not in employment, education or training). "
+        "EdTech platforms for adult and professional learning. UK stories are priority but include major "
+        "global stories on higher education or skills gaps. "
+        "EXCLUDE: primary school and secondary school stories unless directly about the transition to post-18 education. "
+        "EXCLUDE: stories set in educational institutions that are really about something else "
+        "(conflict, religion, disasters, sport). "
+        "Ask: would a UK post-18 education executive find this directly relevant to their market?"
+    ),
 }
 
 
@@ -92,15 +119,17 @@ class LLMClassifier:
                 f"{num}. Title: {article.title}\n   Summary: {summary}"
             )
 
-        prompt = f"""Classify these news articles for a news aggregator.
+        prompt = f"""Classify these news articles for a UK software engineering leader who works in the
+commercial post-18 education sector (apprenticeships, university degrees, professional development).
+Select articles that are professionally relevant or genuinely newsworthy at a strategic level.
 
-Topics:
+Topics and criteria:
 {topic_descriptions}
 
 Rules:
-- Only assign a topic if the article clearly fits
+- Only assign a topic if the article clearly fits the criteria above, including any EXCLUDE rules
 - An article can match multiple topics
-- If the article is general news (politics, sport, entertainment, weather) that doesn't fit any topic, exclude it  # noqa: E501
+- Exclude general news (politics, sport, entertainment, consumer lifestyle, weather)
 - Respond with valid JSON only, mapping article number to its matched topics (empty list = no match)
 
 Example: {{"1": ["tech"], "2": ["ai", "tech"], "3": [], "4": ["education", "cyber_security"]}}
@@ -113,7 +142,11 @@ Articles:
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a news classification assistant. Respond with valid JSON only.",  # noqa: E501
+                    "content": (
+                        "You are a news classification assistant for a senior technology and education professional. "
+                        "Be selective — only include articles that are genuinely relevant to the stated criteria. "
+                        "Respond with valid JSON only."
+                    ),
                 },
                 {"role": "user", "content": prompt},
             ],
