@@ -102,16 +102,35 @@ fetched_at       When this version was fetched
 | Component | Purpose | Config |
 |---|---|---|
 | Lambda | Runs the pipeline | Python 3.12, 512MB, 5-min timeout |
-| EventBridge | Triggers Lambda on schedule | Every hour (prod), daily (dev) |
-| DynamoDB | Article storage | On-demand billing, GSIs |
-| Secrets Manager | API keys and webhook URLs | Runtime injection |
+| EventBridge Scheduler | Triggers Lambda on schedule | Every hour (prod) |
+| DynamoDB | Article storage | PAY_PER_REQUEST, PITR in prod |
+| S3 | Lambda packages + Terraform state | Versioned, encrypted |
 | CloudWatch | Logs and metrics | JSON-structured logs |
+
+Resource names follow the pattern `news-aggregator-{environment}` so prod, dev, and ephemeral test environments coexist without collision.
+
+## CI/CD Pipeline
+
+```
+Every push
+    ├── lint + unit tests + Terraform validate   (always)
+    └── [DEPLOY_ENABLED=true]
+            ├── build Lambda → upload to S3
+            ├── deploy ephemeral test env (test-{run-id})
+            │       ├── invoke Lambda
+            │       ├── assert DynamoDB has articles
+            │       └── destroy (always, even on failure)
+            └── [main branch only]
+                    └── deploy prod
+```
+
+Terraform state is stored in S3 with environment-specific keys (`prod/terraform.tfstate`, `test-{id}/terraform.tfstate`). The same Terraform configuration deploys any environment — the `environment` variable and `-backend-config` flags handle the differences.
 
 ## Environment Variables
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `AWS_REGION` | AWS region | `us-east-1` |
+| `AWS_REGION` | AWS region | `eu-west-1` |
 | `AWS_ENDPOINT_URL` | Override endpoint for LocalStack | unset |
 | `DYNAMODB_TABLE` | DynamoDB table name | `news-articles` |
 | `OPENAI_API_KEY` | OpenAI API key | required |

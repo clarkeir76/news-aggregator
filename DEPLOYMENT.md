@@ -2,8 +2,8 @@
 
 ## Prerequisites
 
-- AWS account with permissions to create Lambda, DynamoDB, EventBridge, IAM, S3, Secrets Manager
-- Terraform >= 1.0 installed
+- AWS account
+- Terraform >= 1.5 installed (`brew install hashicorp/tap/terraform`)
 - GitHub repository with Actions enabled
 - OpenAI API key
 - Slack workspace with Workflow Builder access
@@ -22,145 +22,123 @@ For each topic channel (`#tech`, `#ai`, `#education`, `#cyber-security`):
 4. Add a **Send a message** step using the `payload` variable
 5. Publish the workflow and copy the trigger URL
 
-You'll end up with four URLs:
-```
-SLACK_WEBHOOK_TECH=https://hooks.slack.com/triggers/...
-SLACK_WEBHOOK_AI=https://hooks.slack.com/triggers/...
-SLACK_WEBHOOK_EDUCATION=https://hooks.slack.com/triggers/...
-SLACK_WEBHOOK_CYBER_SECURITY=https://hooks.slack.com/triggers/...
-```
-
 ---
 
 ## Step 2: AWS Setup
 
 ### Terraform state bucket
 
+Include your AWS account ID in the bucket name to ensure global uniqueness:
+
 ```bash
-aws s3 mb s3://news-aggregator-terraform-state
+aws s3 mb s3://news-aggregator-terraform-state-{account-id} --region eu-west-1
 
 aws s3api put-bucket-versioning \
-  --bucket news-aggregator-terraform-state \
+  --bucket news-aggregator-terraform-state-{account-id} \
   --versioning-configuration Status=Enabled
 ```
 
-### GitHub OIDC (for CI/CD)
+### GitHub OIDC
 
 ```bash
-cd .github/scripts
-python setup-oidc.py
+python .github/scripts/setup-oidc.py
 ```
 
-This creates an OIDC provider and an IAM role that GitHub Actions assumes. No long-lived credentials needed.
+Creates an OIDC provider and IAM role so GitHub Actions can deploy to AWS without long-lived credentials. Note the role ARN output — you'll need it in Step 3.
 
 ---
 
-## Step 3: GitHub Secrets
+## Step 3: GitHub Secrets and Variables
 
-Add these secrets to your GitHub repository (**Settings → Secrets and variables → Actions**):
+**Secrets** (Settings → Secrets and variables → Actions → Secrets):
 
 | Secret | Description |
 |---|---|
-| `AWS_ROLE_ARN` | ARN of the IAM role created by setup-oidc.py |
+| `AWS_ROLE_ARN` | ARN output by setup-oidc.py |
 | `OPENAI_API_KEY` | Your OpenAI API key |
 | `SLACK_WEBHOOK_TECH` | Workflow Builder URL for tech channel |
 | `SLACK_WEBHOOK_AI` | Workflow Builder URL for AI channel |
 | `SLACK_WEBHOOK_EDUCATION` | Workflow Builder URL for education channel |
 | `SLACK_WEBHOOK_CYBER_SECURITY` | Workflow Builder URL for cyber security channel |
-| `SLACK_DEPLOYMENT_WEBHOOK` | Optional — webhook for CI/CD deploy notifications |
+| `SLACK_DEPLOYMENT_WEBHOOK` | Optional — for CI/CD deploy notifications |
+
+**Variables** (Settings → Secrets and variables → Actions → Variables):
+
+| Variable | Value |
+|---|---|
+| `TF_STATE_BUCKET` | Your S3 bucket name from Step 2 |
+| `DEPLOY_ENABLED` | Set to `true` to enable CD pipeline |
 
 ---
 
-## Step 4: Deploy Infrastructure
+## Step 4: Deploy
 
-### Option A: Terraform CLI
+### Option A: CI/CD pipeline (recommended)
+
+Set `DEPLOY_ENABLED=true` and push to `main`. The pipeline:
+
+1. Lint, unit test, Terraform validate
+2. Build Lambda package → upload to S3
+3. Deploy ephemeral test environment → run integration test → destroy
+4. Deploy to production (only if tests pass, only on `main`)
+
+All secrets and variables are injected automatically — no manual steps needed.
+
+### Option B: Terraform CLI (manual)
+
+The state bucket and environment are passed via `-backend-config` and `-var` so the same Terraform works for any environment:
 
 ```bash
 cd infra/terraform
 
-terraform init
+# Init (pass bucket and state key)
+terraform init \
+  -backend-config="bucket=news-aggregator-terraform-state-{account-id}" \
+  -backend-config="key=prod/terraform.tfstate"
 
-# Review what will be created
-terraform plan -var-file=terraform.dev.tfvars
-
-# Deploy
-terraform apply -var-file=terraform.dev.tfvars
-```
-
-For production:
-```bash
-terraform apply \
+# Plan
+terraform plan \
   -var-file=terraform.prod.tfvars \
+  -var="environment=prod" \
   -var="openai_api_key=$OPENAI_API_KEY" \
   -var="slack_webhook_tech=$SLACK_WEBHOOK_TECH" \
   -var="slack_webhook_ai=$SLACK_WEBHOOK_AI" \
   -var="slack_webhook_education=$SLACK_WEBHOOK_EDUCATION" \
-  -var="slack_webhook_cyber_security=$SLACK_WEBHOOK_CYBER_SECURITY"
+  -var="slack_webhook_cyber_security=$SLACK_WEBHOOK_CYBER_SECURITY" \
+  -var="lambda_s3_bucket=news-aggregator-terraform-state-{account-id}" \
+  -var="lambda_s3_key=lambda-packages/manual/lambda_function.zip"
+
+# Apply
+terraform apply -auto-approve [same vars as above]
 ```
 
-### Option B: GitHub Actions (automated)
-
-Push to `main` — the pipeline handles everything:
-1. Lint and test
-2. Terraform validate and plan
-3. Terraform apply
-4. Lambda deploy
+**Note**: For manual deploys you need to first build and upload the Lambda package:
+```bash
+mkdir -p lambda_build
+pip install -r requirements.txt -t lambda_build/
+cp -r app config lambda_build/
+cd lambda_build && zip -r ../lambda_function.zip .
+aws s3 cp lambda_function.zip s3://news-aggregator-terraform-state-{account-id}/lambda-packages/manual/lambda_function.zip
+```
 
 ---
 
-## Step 5: Lambda Environment Variables
-
-After deploying via Terraform, set the following environment variables on the Lambda function (either via Terraform variables or the AWS console):
-
-```
-AWS_REGION=eu-west-1
-DYNAMODB_TABLE=news-articles
-OPENAI_API_KEY=<from Secrets Manager>
-OPENAI_MODEL=gpt-4o-mini
-ENABLE_SLACK=true
-ENABLE_SUMMARIZATION=true
-ENABLE_PERSISTENCE=true
-ENABLE_LLM_CLASSIFICATION=true
-FEED_CONFIG_PATH=/opt/config/feeds.yaml
-LOG_LEVEL=INFO
-MAX_ARTICLES_PER_FEED=50
-MAX_CONCURRENT_FEEDS=10
-FEED_TIMEOUT=20
-MAX_CONCURRENT_SUMMARIZATIONS=5
-MAX_ARTICLE_AGE_HOURS=24
-LAST_RUN_FILE=/tmp/.last_run
-SLACK_WEBHOOK_TECH=<from Secrets Manager>
-SLACK_WEBHOOK_AI=<from Secrets Manager>
-SLACK_WEBHOOK_EDUCATION=<from Secrets Manager>
-SLACK_WEBHOOK_CYBER_SECURITY=<from Secrets Manager>
-```
-
-Note: `FEED_CONFIG_PATH` must be set to `/opt/config/feeds.yaml` in Lambda. This is where the build packages `config/feeds.yaml`.
-
----
-
-## Step 6: Verify Deployment
+## Step 5: Verify
 
 ```bash
-# Check Lambda exists
-aws lambda get-function --function-name news-aggregator
+# Lambda exists
+aws lambda get-function --function-name news-aggregator-prod
 
-# Manually trigger a run
+# Trigger manually
 aws lambda invoke \
-  --function-name news-aggregator \
-  --payload '{}' \
-  response.json && cat response.json
+  --function-name news-aggregator-prod \
+  --payload '{}' response.json && cat response.json
 
 # Tail logs
-aws logs tail /aws/lambda/news-aggregator --follow
+aws logs tail /aws/lambda/news-aggregator-prod --follow
 
-# Check for errors
-aws logs filter-log-events \
-  --log-group-name /aws/lambda/news-aggregator \
-  --filter-pattern "ERROR"
-
-# Check articles are being stored
-aws dynamodb scan --table-name news-articles --max-items 5
+# Check DynamoDB has articles
+aws dynamodb scan --table-name news-aggregator-prod-articles --max-items 5
 ```
 
 ---
@@ -168,55 +146,45 @@ aws dynamodb scan --table-name news-articles --max-items 5
 ## Troubleshooting
 
 **No articles being ingested**
-- Check that feed URLs in `config/feeds.yaml` are reachable
+- Check feed URLs in `config/feeds.yaml` are reachable
 - Look for `Failed to fetch feed` in logs
-- Verify `FEED_CONFIG_PATH` points to the right location
+- Verify `FEED_CONFIG_PATH=/opt/config/feeds.yaml` is set on the Lambda
 
 **LLM classification discarding everything**
 - Check OpenAI API key is valid and has quota
-- Set `ENABLE_LLM_CLASSIFICATION=false` to fall back to keyword matching temporarily
-- Check logs for `LLM classification failed`
+- Set `ENABLE_LLM_CLASSIFICATION=false` to fall back to keywords temporarily
 
 **Slack messages not arriving**
 - Verify the webhook URL is a Workflow Builder trigger URL (`hooks.slack.com/triggers/...`)
 - Check the workflow is **published** in Slack (not just saved as draft)
-- Confirm the workflow has a variable named exactly `payload`
-- Check logs for `Slack webhook returned`
+- Confirm the workflow variable is named exactly `payload`
 
-**Lambda timeout**
-- Reduce `MAX_ARTICLES_PER_FEED` or `MAX_CONCURRENT_FEEDS`
-- Increase Lambda timeout in Terraform (currently 5 minutes)
-- Check if a specific feed is hanging (look for feeds with no completion log)
+**Ephemeral test environment failing in CI**
+- Check CloudWatch logs for the test Lambda (`/aws/lambda/news-aggregator-test-{run-id}`)
+- The destroy step always runs so no orphaned resources remain
 
 **DynamoDB errors**
-- Check `DYNAMODB_TABLE` matches the deployed table name
-- Verify the Lambda execution role has `dynamodb:PutItem`, `dynamodb:GetItem`, `dynamodb:UpdateItem`, `dynamodb:Query`, `dynamodb:Scan` permissions
+- Table name follows the pattern `news-aggregator-{environment}-articles`
+- Check Lambda execution role has DynamoDB permissions
 
 ---
 
 ## Cost Estimates
 
-### Development (daily runs, 5 articles/feed)
+### Ephemeral test environment (per CI run)
 - Lambda: ~$0.00 (free tier)
-- DynamoDB: ~$0.50/month
-- OpenAI: ~$1–3/month
-- CloudWatch: ~$0.50/month
+- DynamoDB: ~$0.00 (PAY_PER_REQUEST, tiny volume)
+- OpenAI: ~$0.01 (2 articles × 2 feeds)
 
-**Total: ~$2–4/month**
+**~$0.01 per CI run**
 
-### Production (hourly runs, 50 articles/feed)
+### Production (hourly runs)
 - Lambda: ~$1/month
-- DynamoDB: ~$2–5/month
+- DynamoDB: ~$1–2/month (PAY_PER_REQUEST)
 - OpenAI: ~$15–30/month (classification + summarisation)
 - CloudWatch: ~$1/month
 
-**Total: ~$20–40/month**
-
----
-
-## Updating Feeds
-
-To add or remove RSS feeds, edit `config/feeds.yaml` and push to `main`. The CI/CD pipeline repackages the Lambda with the updated feeds file.
+**Total: ~$18–34/month**
 
 ---
 
@@ -224,8 +192,18 @@ To add or remove RSS feeds, edit `config/feeds.yaml` and push to `main`. The CI/
 
 ```bash
 cd infra/terraform
-terraform destroy -var-file=terraform.prod.tfvars
+
+terraform init \
+  -backend-config="bucket=news-aggregator-terraform-state-{account-id}" \
+  -backend-config="key=prod/terraform.tfstate"
+
+terraform destroy \
+  -var-file=terraform.prod.tfvars \
+  -var="environment=prod" \
+  -var="openai_api_key=dummy" \
+  -var="lambda_s3_bucket=news-aggregator-terraform-state-{account-id}" \
+  -var="lambda_s3_key=dummy"
 
 # Remove state bucket
-aws s3 rb s3://news-aggregator-terraform-state --force
+aws s3 rb s3://news-aggregator-terraform-state-{account-id} --force
 ```

@@ -250,38 +250,40 @@ news-aggregator/
 
 ### Steps
 
-1. **Create Terraform state bucket**:
+1. **Create S3 state bucket** (one-time, include your account ID to ensure uniqueness):
    ```bash
-   aws s3 mb s3://news-aggregator-terraform-state
+   aws s3 mb s3://news-aggregator-terraform-state-{account-id} --region eu-west-1
+   aws s3api put-bucket-versioning --bucket news-aggregator-terraform-state-{account-id} \
+     --versioning-configuration Status=Enabled
    ```
 
-2. **Set GitHub secrets**:
-   - `AWS_ROLE_ARN` — IAM role for GitHub OIDC
+2. **Set up GitHub OIDC**:
+   ```bash
+   python .github/scripts/setup-oidc.py
+   ```
+
+3. **Set GitHub secrets and variables**:
+
+   Secrets (Settings → Secrets → Actions):
+   - `AWS_ROLE_ARN` — output by the OIDC setup script
    - `OPENAI_API_KEY`
    - `SLACK_WEBHOOK_TECH`, `SLACK_WEBHOOK_AI`, `SLACK_WEBHOOK_EDUCATION`, `SLACK_WEBHOOK_CYBER_SECURITY`
    - `SLACK_DEPLOYMENT_WEBHOOK` — optional, for deploy notifications
 
-3. **Deploy infrastructure**:
-   ```bash
-   make tf-init
-   make tf-plan
-   make tf-apply
-   ```
+   Variables (Settings → Variables → Actions):
+   - `TF_STATE_BUCKET` — your S3 bucket name from step 1
 
-4. **Set Lambda environment variables** — mirror your `.env` in the Lambda console or via Terraform variables. Set `FEED_CONFIG_PATH=/opt/config/feeds.yaml`.
+4. **Enable deployment** — set the `DEPLOY_ENABLED` repository variable to `true`.
 
 ### CI/CD Pipeline
 
-On every push to `main`:
-- Lint and test
-- Package Lambda function
-- Terraform apply
-- Deploy Lambda
-- Notify Slack on completion
+On every push (when `DEPLOY_ENABLED=true`):
+- Lint, test, Terraform validate
+- Build Lambda package → upload to S3
+- Deploy ephemeral test environment → run integration test → destroy
+- On `main` only: deploy to production
 
-On every PR:
-- Lint and test
-- Terraform validate and plan (plan posted as PR comment)
+The ephemeral test environment creates a real but short-lived AWS environment, runs the Lambda once, verifies DynamoDB has articles, then destroys everything. Production only deploys if the test passes.
 
 ## Code Quality
 
