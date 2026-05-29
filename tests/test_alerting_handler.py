@@ -80,9 +80,7 @@ def test_alarm_emoji_is_red_circle(monkeypatch):
 
     with patch("urllib.request.urlopen") as mock_urlopen:
         mock_urlopen.return_value = MagicMock()
-        handler.lambda_handler(
-            make_sns_event("test-alarm", "ALARM", "reason"), None
-        )
+        handler.lambda_handler(make_sns_event("test-alarm", "ALARM", "reason"), None)
 
     body = json.loads(mock_urlopen.call_args[0][0].data.decode())
     assert "\U0001f534" in body["payload"]  # 🔴
@@ -97,9 +95,7 @@ def test_payload_sent_to_correct_webhook(monkeypatch):
 
     with patch("urllib.request.urlopen") as mock_urlopen:
         mock_urlopen.return_value = MagicMock()
-        handler.lambda_handler(
-            make_sns_event("test-alarm", "ALARM", "reason"), None
-        )
+        handler.lambda_handler(make_sns_event("test-alarm", "ALARM", "reason"), None)
 
     request = mock_urlopen.call_args[0][0]
     assert request.full_url == webhook
