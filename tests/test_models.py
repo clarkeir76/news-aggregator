@@ -75,6 +75,32 @@ def test_article_to_dict_iso_format():
     assert isinstance(data["fetched_at"], str)  # utcnow() — just verify it serialised
 
 
+def test_stored_article_from_dict_strips_dynamodb_gsi_keys():
+    """DynamoDB items contain GSI keys not in the dataclass — must be stripped."""
+    from app.src.models import StoredArticle
+
+    data = {
+        "title": "Test",
+        "source": "test.com",
+        "url": "https://test.com",
+        "published_at": "2024-01-15T10:00:00",
+        "fetched_at": "2024-01-15T10:00:00",
+        "first_seen_at": "2024-01-15T10:00:00",
+        "last_seen_at": "2024-01-15T10:00:00",
+        "content": "Test content",
+        "topics": ["tech"],
+        "related_urls": [],
+        "pk": "ARTICLE#abc",
+        "sk": "METADATA",
+        "url_gsi_pk": "URL#https://test.com",
+        "source_date_gsi_pk": "SOURCE#test.com",
+        "source_date_gsi_sk": "DATE#2024-01-15",
+    }
+    article = StoredArticle.from_dict(data)
+    assert article.title == "Test"
+    assert article.url == "https://test.com"
+
+
 def test_topic_enum():
     """Test topic enumeration"""
     assert Topic.TECH.value == "tech"

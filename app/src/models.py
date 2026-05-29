@@ -1,6 +1,6 @@
 """Data models for news articles"""
 
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, asdict, field, fields
 from datetime import datetime
 from typing import List, Optional
 import hashlib
@@ -91,6 +91,22 @@ class StoredArticle(Article):
         data["first_seen_at"] = self.first_seen_at.isoformat()
         data["last_seen_at"] = self.last_seen_at.isoformat()
         return data
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "StoredArticle":
+        """Create from DynamoDB item — strips GSI keys and other unknown fields."""
+        data = data.copy()
+        valid = {f.name for f in fields(cls)}
+        data = {k: v for k, v in data.items() if k in valid}
+        for date_field in (
+            "published_at",
+            "fetched_at",
+            "first_seen_at",
+            "last_seen_at",
+        ):
+            if date_field in data and isinstance(data[date_field], str):
+                data[date_field] = datetime.fromisoformat(data[date_field])
+        return cls(**data)
 
     @classmethod
     def from_article(cls, article: Article, article_id: str = None) -> "StoredArticle":
