@@ -50,7 +50,6 @@ module "lambda" {
 
   environment_variables = {
     DYNAMODB_TABLE               = module.dynamodb.table_name
-    AWS_REGION                   = var.aws_region
     OPENAI_API_KEY               = var.openai_api_key
     OPENAI_MODEL                 = var.openai_model
     ENABLE_SLACK                 = tostring(var.enable_slack)
