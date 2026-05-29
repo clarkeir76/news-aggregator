@@ -104,18 +104,20 @@ resource "aws_cloudwatch_metric_alarm" "duration" {
   alarm_actions = [aws_sns_topic.alarms.arn]
 }
 
-# Alarm: no invocations for 5 hours (misses a scheduled run)
-# Schedule is 8am/12pm/4pm weekdays — max legitimate gap is 4 hours.
-# A 5-hour window catches a missed run without false-alerting between runs.
-# Weekends still produce false alarms; this is acceptable given the schedule.
+# Alarm: no invocations for 70 consecutive hours
+# Schedule is 8am/12pm/4pm weekdays (Europe/London).
+# Longest legitimate gap: Friday 4pm → Monday 8am = 64 hours.
+# 70 hours means the alarm only fires if Lambda misses the Monday 8am run
+# AND the Monday 12pm run — i.e. something is genuinely broken, not just
+# overnight or a weekend.
 resource "aws_cloudwatch_metric_alarm" "no_invocations" {
   alarm_name          = "${var.name_prefix}-no-invocations"
-  alarm_description   = "Lambda has not been invoked in 5 hours — a scheduled run may have been missed"
+  alarm_description   = "Lambda has not been invoked in 70 hours — EventBridge may have stopped"
   comparison_operator = "LessThanThreshold"
-  evaluation_periods  = 1
+  evaluation_periods  = 70
   metric_name         = "Invocations"
   namespace           = "AWS/Lambda"
-  period              = 18000 # 5 hours
+  period              = 3600 # 1 hour × 70 = 70 hours total
   statistic           = "Sum"
   threshold           = 1
   treat_missing_data  = "breaching"
