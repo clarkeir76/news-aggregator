@@ -59,7 +59,7 @@ module "lambda" {
     LOG_LEVEL                    = var.log_level
     MAX_ARTICLES_PER_FEED        = tostring(var.max_articles_per_feed)
     MAX_CONCURRENT_FEEDS         = "10"
-    FEED_CONFIG_PATH             = "/opt/config/feeds.yaml"
+    FEED_CONFIG_PATH             = "/var/task/config/feeds.yaml"
     SLACK_WEBHOOK_TECH           = var.slack_webhook_tech
     SLACK_WEBHOOK_AI             = var.slack_webhook_ai
     SLACK_WEBHOOK_EDUCATION      = var.slack_webhook_education

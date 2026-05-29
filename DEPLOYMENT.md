@@ -148,7 +148,7 @@ aws dynamodb scan --table-name news-aggregator-prod-articles --max-items 5
 **No articles being ingested**
 - Check feed URLs in `config/feeds.yaml` are reachable
 - Look for `Failed to fetch feed` in logs
-- Verify `FEED_CONFIG_PATH=/opt/config/feeds.yaml` is set on the Lambda
+- Verify `FEED_CONFIG_PATH=/var/task/config/feeds.yaml` is set on the Lambda
 
 **LLM classification discarding everything**
 - Check OpenAI API key is valid and has quota
