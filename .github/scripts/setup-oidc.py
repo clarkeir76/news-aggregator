@@ -42,8 +42,10 @@ trust_policy = {
             "Action": "sts:AssumeRoleWithWebIdentity",
             "Condition": {
                 "StringEquals": {
-                    "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-                    "token.actions.githubusercontent.com:sub": f"repo:{GITHUB_ORG}/{REPO_NAME}:ref:refs/heads/main"
+                    "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+                },
+                "StringLike": {
+                    "token.actions.githubusercontent.com:sub": f"repo:{GITHUB_ORG}/{REPO_NAME}:*"
                 }
             }
         }
@@ -75,7 +77,7 @@ try:
         [
             "aws", "iam", "attach-role-policy",
             "--role-name", "news-aggregator-github-actions",
-            "--policy-arn", "arn:aws:iam::aws:policy/PowerUserAccess"
+            "--policy-arn", "arn:aws:iam::aws:policy/AdministratorAccess"
         ],
         check=True,
         capture_output=True
