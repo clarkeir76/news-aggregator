@@ -175,13 +175,20 @@ class DynamoDBStore:
             logger.error(f"Error saving last run time: {e}")
 
     def get_recent_articles(self, limit: int = 100) -> List[StoredArticle]:
-        """Get recent articles"""
+        """Get recent articles — filters to ARTICLE# partition keys only."""
         try:
+            from boto3.dynamodb.conditions import Attr
+
             response = self.table.scan(
                 Limit=limit,
+                FilterExpression=Attr("pk").begins_with("ARTICLE#"),
             )
 
-            return [StoredArticle.from_dict(item) for item in response.get("Items", [])]
+            return [
+                StoredArticle.from_dict(item)
+                for item in response.get("Items", [])
+                if item.get("pk", "").startswith("ARTICLE#")
+            ]
         except ClientError as e:
             logger.error(f"Error retrieving recent articles: {e}")
             return []

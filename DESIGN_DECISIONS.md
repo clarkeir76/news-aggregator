@@ -82,6 +82,10 @@ Key decisions and the reasoning behind them.
 
 ---
 
+## DynamoDB partition key conventions
+
+Article records use `pk = ARTICLE#{uuid}`, system records use `pk = SYSTEM#config`. The `get_recent_articles()` scan filters to `ARTICLE#` keys only — this prevents system records (e.g. `last_run` timestamps) from being passed to `StoredArticle.from_dict()` and crashing.
+
 ## DynamoDB for persistence
 
 **Decision**: DynamoDB with a simple `ARTICLE#{uuid}` / `METADATA` key scheme and two GSIs.

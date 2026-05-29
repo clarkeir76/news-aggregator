@@ -116,6 +116,23 @@ def test_get_recent_articles_handles_gsi_keys_without_crashing(store, mock_table
     assert results[0].url == "https://example.com/article"
 
 
+def test_get_recent_articles_excludes_system_records(store, mock_table):
+    """SYSTEM#config records must be excluded even if scan returns them."""
+    system_item = {
+        "pk": "SYSTEM#config",
+        "sk": "last_run",
+        "timestamp": "2024-01-15T10:00:00",
+    }
+    article_item = make_dynamo_item()
+    # Mock returns both (boto3 mock doesn't apply FilterExpression)
+    mock_table.scan.return_value = {"Items": [system_item, article_item]}
+
+    results = store.get_recent_articles()
+
+    assert len(results) == 1
+    assert results[0].url == "https://example.com/article"
+
+
 def test_get_recent_articles_returns_empty_on_error(store, mock_table):
     mock_table.scan.side_effect = ClientError(
         {"Error": {"Code": "500", "Message": "error"}}, "scan"
