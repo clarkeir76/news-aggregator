@@ -97,3 +97,10 @@ variable "slack_webhook_cyber_security" {
   sensitive = true
   default   = ""
 }
+
+variable "slack_alert_webhook" {
+  description = "Slack webhook for operational alerts (errors, timeouts, missed runs). Leave empty to disable alerting."
+  type        = string
+  sensitive   = true
+  default     = ""
+}

@@ -283,5 +283,6 @@ jobs:
             -var="slack_webhook_education=${{ secrets.SLACK_WEBHOOK_EDUCATION }}" \
             -var="slack_webhook_cyber_security=${{ secrets.SLACK_WEBHOOK_CYBER_SECURITY }}" \
             -var="lambda_s3_bucket=${{ vars.TF_STATE_BUCKET }}" \
-            -var="lambda_s3_key=${{ needs.build-lambda.outputs.s3_key }}"
+            -var="lambda_s3_key=${{ needs.build-lambda.outputs.s3_key }}" \
+            -var="slack_alert_webhook=${{ secrets.SLACK_ALERT_WEBHOOK }}"
 

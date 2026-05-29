@@ -83,3 +83,14 @@ resource "aws_cloudwatch_log_group" "lambda" {
   name              = "/aws/lambda/${module.lambda.function_name}"
   retention_in_days = var.log_retention_days
 }
+
+# Alerting — only deployed when a Slack alert webhook is provided (prod only)
+module "alerting" {
+  count  = var.slack_alert_webhook != "" ? 1 : 0
+  source = "./modules/alerting"
+
+  name_prefix          = local.name_prefix
+  environment          = var.environment
+  lambda_function_name = module.lambda.function_name
+  slack_alert_webhook  = var.slack_alert_webhook
+}
