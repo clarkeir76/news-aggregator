@@ -181,6 +181,29 @@ def test_topic_descriptions_contain_exclusion_criteria():
     assert "consumer" in TOPICS["tech"].lower()
 
 
+def test_cluster_prompt_is_strict(mock_openai):
+    """Clustering prompt must contain strictness rules to prevent over-clustering."""
+    import json
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps({"groups": [[1], [2]]})
+
+    articles = [
+        make_article("Story A", url="https://a.com/1"),
+        make_article("Story B", url="https://b.com/1"),
+    ]
+    classifier = LLMClassifier(api_key="test-key")
+    classifier.cluster_stories(articles)
+
+    prompt = mock_openai.chat.completions.create.call_args.kwargs["messages"][1][
+        "content"
+    ]
+    assert "exact same specific event" in prompt.lower() or "exact" in prompt.lower()
+    assert "when in doubt" in prompt.lower()
+    assert "maximum of 3" in prompt.lower() or "max" in prompt.lower()
+
+
 def test_cluster_stories_merges_same_story(mock_openai):
     import json
 

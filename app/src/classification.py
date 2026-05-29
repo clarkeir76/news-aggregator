@@ -77,12 +77,19 @@ class LLMClassifier:
         indexed = {str(i + 1): article for i, article in enumerate(articles)}
         lines = [f"{num}. {article.title}" for num, article in indexed.items()]
 
-        prompt = f"""Group these news article titles by story. Articles covering the same event,
-announcement, or development should be in the same group. Different outlets covering the same
-story count as one group.
+        prompt = f"""Group these news article titles where multiple outlets are reporting on the
+EXACT SAME specific news event, incident, or announcement.
 
-Return JSON only: {{"groups": [[1, 4], [2], [3, 5, 6]]}}
-Each inner list contains article numbers that cover the same story.
+Rules:
+- Only group articles if they are clearly about the same specific event (e.g. the same breach,
+  the same product launch, the same report)
+- Do NOT group articles that merely share a topic or theme (e.g. two different AI security stories
+  are NOT the same story even if both involve AI and security)
+- Each group should have a maximum of 3 articles
+- When in doubt, keep articles separate — it is better to under-cluster than over-cluster
+- Every article number must appear in exactly one group
+
+Return JSON only: {{"groups": [[1, 4], [2], [3], [5, 6]]}}
 
 Titles:
 {chr(10).join(lines)}"""
@@ -92,7 +99,7 @@ Titles:
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a news deduplication assistant. Respond with valid JSON only.",  # noqa: E501
+                    "content": "You are a strict news deduplication assistant. Only group articles reporting on the exact same specific event. Respond with valid JSON only.",  # noqa: E501
                 },
                 {"role": "user", "content": prompt},
             ],

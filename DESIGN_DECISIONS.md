@@ -14,6 +14,12 @@ Key decisions and the reasoning behind them.
 
 ---
 
+## Story clustering strictness
+
+**Decision**: The clustering prompt explicitly requires articles to be about the *exact same specific event*, not merely the same topic or theme. Rules include: max 3 articles per cluster, when in doubt keep separate, do not cluster articles that share a theme but cover different incidents.
+
+**Why**: Initial prompt ("same event, announcement, or development") caused the LLM to over-cluster — grouping thematically related articles (e.g. multiple different AI security stories) into a single digest entry with many unrelated URLs. Under-clustering is always preferable to over-clustering.
+
 ## LLM classification with reader-specific criteria
 
 **Decision**: The classification prompt includes explicit include/exclude criteria per topic, calibrated for a UK software engineering leader in the post-18 education sector. Topic descriptions define not just what to include but what to actively exclude (e.g. consumer tech deals for `tech`, primary school stories for `education`). The system prompt identifies the reader role so the LLM can make relevance judgements at the right level.
