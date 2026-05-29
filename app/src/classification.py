@@ -14,32 +14,32 @@ CLASSIFICATION_BATCH_SIZE = 50
 
 TOPICS = {
     Topic.AI.value: (
-        "Artificial intelligence and machine learning: LLMs, generative AI, AI research breakthroughs, "
+        "Artificial intelligence and machine learning: LLMs, generative AI, AI research breakthroughs, "  # noqa: E501
         "new AI products and tools, AI company news (OpenAI, Anthropic, Google DeepMind etc.), "
         "AI regulation and policy, AI's impact on work and industries. "
         "Cast a wide net — include most AI stories."
     ),
     Topic.TECH.value: (
-        "Technology news relevant to a software engineering leader: new developer tools and frameworks, "
-        "cloud platform updates, software engineering practices, startup launches and significant funding rounds, "
+        "Technology news relevant to a software engineering leader: new developer tools and frameworks, "  # noqa: E501
+        "cloud platform updates, software engineering practices, startup launches and significant funding rounds, "  # noqa: E501
         "technical innovations worth discussing at CTO or engineering manager level. "
-        "EXCLUDE: consumer product deals and discounts (e.g. '50% off TV'), gaming releases and reviews, "
-        "home entertainment, fitness gadgets, 'best buy' recommendations, and any story whose primary "
+        "EXCLUDE: consumer product deals and discounts (e.g. '50% off TV'), gaming releases and reviews, "  # noqa: E501
+        "home entertainment, fitness gadgets, 'best buy' recommendations, and any story whose primary "  # noqa: E501
         "angle is a price reduction or retail promotion rather than the technology itself."
     ),
     Topic.CYBER_SECURITY.value: (
-        "Cybersecurity news: data breaches, ransomware attacks, software vulnerabilities and patches, "
-        "hacking incidents, privacy violations, security policy and regulation, nation-state cyber activity. "
+        "Cybersecurity news: data breaches, ransomware attacks, software vulnerabilities and patches, "  # noqa: E501
+        "hacking incidents, privacy violations, security policy and regulation, nation-state cyber activity. "  # noqa: E501
         "Include most cybersecurity stories — cast a wide net."
     ),
     Topic.EDUCATION.value: (
-        "Post-18 education and skills in the UK and globally: university admissions and policy, degree programmes, "
-        "apprenticeships (especially UK levy-funded), professional qualifications and development, vocational training. "
+        "Post-18 education and skills in the UK and globally: university admissions and policy, degree programmes, "  # noqa: E501
+        "apprenticeships (especially UK levy-funded), professional qualifications and development, vocational training. "  # noqa: E501
         "Government policy on higher education, skills funding, and apprenticeships. "
-        "Youth unemployment and the NEET issue (18-24 year olds not in employment, education or training). "
-        "EdTech platforms for adult and professional learning. UK stories are priority but include major "
+        "Youth unemployment and the NEET issue (18-24 year olds not in employment, education or training). "  # noqa: E501
+        "EdTech platforms for adult and professional learning. UK stories are priority but include major "  # noqa: E501
         "global stories on higher education or skills gaps. "
-        "EXCLUDE: primary school and secondary school stories unless directly about the transition to post-18 education. "
+        "EXCLUDE: primary school and secondary school stories unless directly about the transition to post-18 education. "  # noqa: E501
         "EXCLUDE: stories set in educational institutions that are really about something else "
         "(conflict, religion, disasters, sport). "
         "Ask: would a UK post-18 education executive find this directly relevant to their market?"
@@ -92,7 +92,7 @@ Titles:
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a news deduplication assistant. Respond with valid JSON only.",
+                    "content": "You are a news deduplication assistant. Respond with valid JSON only.",  # noqa: E501
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -182,7 +182,7 @@ Titles:
                 f"{num}. Title: {article.title}\n   Summary: {summary}"
             )
 
-        prompt = f"""Classify these news articles for a UK software engineering leader who works in the
+        prompt = f"""Classify these news articles for a UK software engineering leader who works in the  # noqa: E501
 commercial post-18 education sector (apprenticeships, university degrees, professional development).
 Select articles that are professionally relevant or genuinely newsworthy at a strategic level.
 
@@ -206,8 +206,8 @@ Articles:
                 {
                     "role": "system",
                     "content": (
-                        "You are a news classification assistant for a senior technology and education professional. "
-                        "Be selective — only include articles that are genuinely relevant to the stated criteria. "
+                        "You are a news classification assistant for a senior technology and education professional. "  # noqa: E501
+                        "Be selective — only include articles that are genuinely relevant to the stated criteria. "  # noqa: E501
                         "Respond with valid JSON only."
                     ),
                 },
