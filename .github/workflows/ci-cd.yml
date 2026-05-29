@@ -48,10 +48,6 @@ jobs:
       - name: Lint (flake8)
         run: flake8 app/ tests/ --max-line-length=100
 
-      - name: Type check (mypy)
-        run: mypy app/src/ --ignore-missing-imports
-        continue-on-error: true
-
       - name: Run unit tests
         run: pytest tests/ -v --ignore=tests/integration_test.py --cov=app/src --cov-report=xml
 
