@@ -307,12 +307,13 @@ class KeywordClassifier:
                     break
         return matched or [Topic.TECH.value]
 
-    def classify_articles(self, articles: List[Article]) -> List[Article]:
+    def classify_and_filter(self, articles: List[Article]) -> List[Article]:
+        """Keyword classifier keeps all articles (no confidence in rejecting)."""
         for article in articles:
             article.topics = self.classify(article)
             logger.debug(f"Classified '{article.title}' as {article.topics}")
         return articles
 
-    def classify_and_filter(self, articles: List[Article]) -> List[Article]:
-        """Keyword classifier keeps all articles (no confidence in rejecting)."""
-        return self.classify_articles(articles)
+    def cluster_stories(self, articles: List[Article]) -> List[Article]:
+        """Keyword classifier has no clustering — return articles unchanged."""
+        return articles

@@ -49,7 +49,7 @@ class NewsAggregator:
         max_concurrent_summarizations: int = 5,
         feed_timeout: int = 20,
         max_article_age_hours: int = 24,
-        last_run_file: str = "logs/.last_run",
+        last_run_file: str = "config/.last_run",
     ):
         self.feed_config_path = feed_config_path
         self.max_concurrent_feeds = max_concurrent_feeds
@@ -111,7 +111,7 @@ class NewsAggregator:
         logger.info("Starting news aggregation pipeline")
         run_start = datetime.now(timezone.utc)
         self.stats = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "feeds_processed": 0,
             "articles_ingested": 0,
             "articles_classified": 0,
@@ -142,9 +142,8 @@ class NewsAggregator:
             logger.info(f"{len(articles)} articles matched our topics")
 
             # Step 3: Cluster same-story articles across sources
-            if hasattr(self.classifier, "cluster_stories"):
-                articles = self.classifier.cluster_stories(articles)
-                self.stats["articles_classified"] = len(articles)
+            articles = self.classifier.cluster_stories(articles)
+            self.stats["articles_classified"] = len(articles)
 
             # Step 4: Fetch full article text (matched articles only, concurrent)
             articles = self._enrich_content(articles)
@@ -162,6 +161,7 @@ class NewsAggregator:
             self.stats.update(dedup_stats)
 
             # Step 6: Persist
+
             new_articles = []
             for article in unique_articles:
                 if self.store:
@@ -172,10 +172,10 @@ class NewsAggregator:
                 else:
                     new_articles.append((article, None))
 
-            # Step 6: Summarise (concurrent)
+            # Step 7: Summarise (concurrent)
             summaries = self._summarise(new_articles)
 
-            # Step 7: Notify
+            # Step 8: Notify
             if self.notifier and new_articles:
                 articles_to_notify = [article for article, _ in new_articles]
                 if self.notifier.notify_digest(articles_to_notify, summaries):

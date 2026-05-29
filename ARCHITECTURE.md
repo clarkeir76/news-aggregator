@@ -32,8 +32,8 @@ Requests are ordered to minimise cost and latency — cheap operations first, ex
 All feeds are fetched concurrently (`MAX_CONCURRENT_FEEDS`, default 10) using `feedparser`. Each article's title and RSS summary are stored as-is. No full article text is fetched at this stage.
 
 Articles older than the cutoff are discarded here before anything else runs. The cutoff is the most recent of:
-- `now - MAX_ARTICLE_AGE_HOURS` (default 24h — hard cap)
-- the timestamp of the last successful run (stored in `logs/.last_run` locally, or DynamoDB when persistence is enabled)
+- `now - MAX_ARTICLE_AGE_HOURS` (default 60h — hard cap, covers weekend gaps)
+- the timestamp of the last successful run (stored in `config/.last_run` locally or `/tmp/.last_run` in Lambda, with DynamoDB as the authoritative source when persistence is enabled)
 
 This means hourly runs only process the last hour's articles. If the pipeline hasn't run for 3 days it still caps at 24 hours.
 
@@ -146,8 +146,8 @@ Terraform state is stored in S3 with environment-specific keys (`prod/terraform.
 | `MAX_CONCURRENT_FEEDS` | Parallel feed/article fetches | `10` |
 | `FEED_TIMEOUT` | Seconds to wait for each feed HTTP request | `20` |
 | `MAX_CONCURRENT_SUMMARIZATIONS` | Parallel OpenAI summarisation calls | `5` |
-| `MAX_ARTICLE_AGE_HOURS` | Discard articles older than this (0 = disabled) | `24` |
-| `LAST_RUN_FILE` | Path to last run timestamp file | `logs/.last_run` |
+| `MAX_ARTICLE_AGE_HOURS` | Discard articles older than this (0 = disabled) | `60` |
+| `LAST_RUN_FILE` | Path to last run timestamp file | `config/.last_run` (local), `/tmp/.last_run` (Lambda) |
 
 ## RSS Feed Configuration
 

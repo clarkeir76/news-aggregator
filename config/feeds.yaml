@@ -77,3 +77,43 @@ feeds:
   # - url: "https://www.qaa.ac.uk/rss/news"  # FAIL: 404
   # - url: "https://www.timeshighereducation.com/rss.xml"  # FAIL: 403
   # - url: "https://www.universitiesuk.ac.uk/rss.xml"  # FAIL: 403
+
+  #------------New feeds ----------------------------------------------------------------------------------
+
+  # Security news
+  - url: "https://www.helpnetsecurity.com/feed/"
+  - url: "https://therecord.media/feed"
+  - url: "https://cybersecuritynews.com/feed/"
+  - url: "https://www.esecurityplanet.com/feed/"
+  - url: "https://www.theregister.com/security/headlines.atom"
+
+  # AI-specific
+  - url: "https://www.theregister.com/software/ai_ml/headlines.atom"
+
+  # Threat intelligence & security research
+  # - url: "https://feeds.trendmicro.com/TrendMicroSimplySecurity"  # FAIL: no entries
+  - url: "https://research.checkpoint.com/feed/"
+  - url: "https://security.googleblog.com/atom.xml"
+  - url: "https://www.microsoft.com/security/blog/feed/"
+  - url: "https://sec.cloudapps.cisco.com/security/center/psirtrss20/CiscoSecurityAdvisory.xml"
+  - url: "https://unit42.paloaltonetworks.com/feed/"
+  - url: "https://www.varonis.com/blog/feed"
+
+  # Vendor / platform security blogs
+  - url: "https://blogs.cisco.com/feed"
+  # - url: "https://www.akamai.com/blog/rss.xml"  # FAIL: no entries
+  - url: "https://www.crowdstrike.com/blog/feed/"
+  # - url: "https://www.okta.com/blog/feed/"  # FAIL: no entries
+  # - url: "https://www.fortinet.com/blog/rss.xml"  # FAIL: no entries
+  # - url: "https://www.zscaler.com/blogs/rss.xml"  # FAIL: no entries
+  - url: "https://blog.cloudflare.com/rss/"
+  # - url: "https://www.wiz.io/blog/rss.xml"  # FAIL: no entries
+
+  # Google ecosystem
+  - url: "https://developers.googleblog.com/feeds/posts/default"
+  - url: "https://cloudblog.withgoogle.com/rss/"
+
+  # AI / enterprise AI
+  - url: "https://techcrunch.com/category/artificial-intelligence/feed/"
+  - url: "https://www.cnbc.com/id/19854910/device/rss/rss.html"
+  - url: "https://winbuzzer.com/feed/"

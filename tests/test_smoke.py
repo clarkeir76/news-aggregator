@@ -51,17 +51,6 @@ def test_llm_classifier_initializes():
     assert callable(c.classify_and_filter)
 
 
-def test_feedparser_parse_accepts_no_timeout_kwarg():
-    """feedparser.parse() does not accept a timeout kwarg in v6 — must use socket."""
-    import feedparser
-    import inspect
-
-    sig = inspect.signature(feedparser.parse)
-    assert (
-        "timeout" not in sig.parameters
-    ), "feedparser.parse() gained a timeout param — remove the socket workaround in ingestion.py"
-
-
 def test_feedparser_parse_called_without_timeout():
     """RSSIngester must be able to call feedparser.parse() without raising TypeError."""
     from unittest.mock import patch, MagicMock

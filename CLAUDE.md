@@ -24,9 +24,13 @@ NEVER use `--no-verify` for `feat:`, `fix:`, `refactor:`, `docs:`, or any other 
 ```
 ingest (RSS title + summary, concurrent)
   → LLM batch classify + filter (one API call)
-    → fetch full article text (concurrent, matched articles only)
-      → deduplicate → persist (DynamoDB, optional) → summarise → Slack digest
+    → cluster same-story articles across sources (LLMClassifier only)
+      → fetch full article text (concurrent, matched articles only)
+        → deduplicate → persist (DynamoDB, optional) → summarise → Slack digest
 ```
+
+Alerting: CloudWatch Alarms → SNS → alerting Lambda → Slack (`SLACK_ALERT_WEBHOOK`).
+Three alarms: Lambda errors, duration approaching timeout, no invocations for 2 hours.
 
 ## Key Design Rules
 
