@@ -137,16 +137,10 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Build Lambda package (Amazon Linux compatible)
+      - name: Build Lambda package
         run: |
           mkdir -p lambda_build
-          # Use manylinux wheels so native packages (lxml, trafilatura) are
-          # compatible with Lambda's Amazon Linux 2 runtime
-          pip install -r requirements.txt -t lambda_build/ --quiet \
-            --platform manylinux2014_x86_64 \
-            --only-binary :all: \
-            --python-version 3.12 \
-            --implementation cp
+          pip install -r requirements.txt -t lambda_build/ --quiet
           cp -r app lambda_build/
           cp -r config lambda_build/
           cd lambda_build && zip -r ../lambda_function.zip . -q
@@ -223,6 +217,12 @@ jobs:
             --function-name "news-aggregator-${{ env.ENV_NAME }}" \
             --table-name "news-aggregator-${{ env.ENV_NAME }}-articles" \
             --region ${{ env.AWS_REGION }}
+
+      - name: Fetch Lambda logs on failure
+        if: failure()
+        run: |
+          aws logs tail /aws/lambda/news-aggregator-${{ env.ENV_NAME }} \
+            --since 10m --format short 2>/dev/null || echo "No logs found"
 
       - name: Terraform Destroy
         if: always()

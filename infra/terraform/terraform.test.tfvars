@@ -3,7 +3,7 @@
 aws_region = "eu-west-1"
 
 lambda_timeout     = 300
-lambda_memory_size = 512
+lambda_memory_size = 1024
 
 eventbridge_schedule = "cron(0 0 1 1 ? 2099)" # Effectively disabled — triggered manually in CI
 
