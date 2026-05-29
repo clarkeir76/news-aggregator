@@ -220,7 +220,9 @@ def test_enrich_content_handles_fetch_failure(mocker, feed_config_file, article)
 
     assert len(result) == 1
     assert result[0].url == article.url
-    assert result[0].content == original_content  # original content preserved on failure
+    assert (
+        result[0].content == original_content
+    )  # original content preserved on failure
 
 
 def test_summarise_runs_concurrently(mocker, feed_config_file, article):
