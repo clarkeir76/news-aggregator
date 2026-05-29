@@ -44,39 +44,35 @@ for article in articles[:3]:
 "
 ```
 
-## 10-Minute Development Setup
+## 10-Minute Development Setup — DynamoDB Local
 
-### Docker
-
-```bash
-# Build and run with Docker Compose
-docker-compose up -d
-
-# Check logs
-docker-compose logs -f app
-```
-
-### With LocalStack (Local AWS Emulation)
+Requires Docker Desktop or Colima (free Docker Desktop alternative: `brew install colima docker docker-compose awscli && colima start`).
 
 ```bash
-# Start LocalStack with news aggregator
-docker-compose up -d localstack
+# Start DynamoDB Local
+docker-compose up -d dynamodb-local
 
-# Configure AWS CLI to use LocalStack
-export AWS_ENDPOINT_URL=http://localhost:4566
-export AWS_ACCESS_KEY_ID=test
-export AWS_SECRET_ACCESS_KEY=test
-
-# Create DynamoDB table
+# Create the table
+AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test \
 aws dynamodb create-table \
+  --endpoint-url http://localhost:8000 \
+  --region us-east-1 \
   --table-name news-articles \
   --attribute-definitions AttributeName=pk,AttributeType=S AttributeName=sk,AttributeType=S \
   --key-schema AttributeName=pk,KeyType=HASH AttributeName=sk,KeyType=RANGE \
   --billing-mode PAY_PER_REQUEST
 
-# Test with app
+# Update .env
+# ENABLE_PERSISTENCE=true
+# AWS_ENDPOINT_URL=http://localhost:8000
+# AWS_ACCESS_KEY_ID=test
+# AWS_SECRET_ACCESS_KEY=test
+
+# Run the app
 python app/lambda_handler.py
 ```
+
+Note: DynamoDB Local is in-memory — re-run the `create-table` command after restarting the container.
 
 ## Run Tests
 

@@ -76,7 +76,7 @@ python app/lambda_handler.py
 | Variable | Description | Default |
 |---|---|---|
 | `AWS_REGION` | AWS region | `us-east-1` |
-| `AWS_ENDPOINT_URL` | Override AWS endpoint — set to `http://localhost:4566` for LocalStack | unset (real AWS) |
+| `AWS_ENDPOINT_URL` | Override AWS endpoint — set to `http://localhost:8000` for DynamoDB Local | unset (real AWS) |
 | `DYNAMODB_TABLE` | DynamoDB table name | `news-articles` |
 | `OPENAI_API_KEY` | OpenAI API key | required |
 | `OPENAI_MODEL` | OpenAI model | `gpt-4o-mini` |
@@ -150,29 +150,33 @@ ENABLE_SLACK=log
 
 Digest content is printed to the terminal per topic channel.
 
-### Mode 3 — Full local stack with LocalStack
+### Mode 3 — Full local stack with DynamoDB Local
 
-Requires Docker. Emulates DynamoDB locally:
+Requires Docker (or Colima — a free alternative to Docker Desktop). Runs DynamoDB locally via `amazon/dynamodb-local`:
 
 ```
 ENABLE_PERSISTENCE=true
-AWS_ENDPOINT_URL=http://localhost:4566
+AWS_ENDPOINT_URL=http://localhost:8000
 AWS_ACCESS_KEY_ID=test
 AWS_SECRET_ACCESS_KEY=test
 ```
 
-Start LocalStack and create the table:
+Start DynamoDB Local and create the table:
 
 ```bash
-docker-compose up -d localstack
+docker-compose up -d dynamodb-local
 
+AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test \
 aws dynamodb create-table \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:8000 \
+  --region us-east-1 \
   --table-name news-articles \
   --attribute-definitions AttributeName=pk,AttributeType=S AttributeName=sk,AttributeType=S \
   --key-schema AttributeName=pk,KeyType=HASH AttributeName=sk,KeyType=RANGE \
   --billing-mode PAY_PER_REQUEST
 ```
+
+Note: DynamoDB Local runs in-memory — the table resets if the container is stopped. Re-run the `create-table` command after each restart.
 
 ### Mode 4 — Full AWS
 
@@ -291,7 +295,7 @@ make lint     # black check + flake8 + mypy
 **`ResourceNotFoundException: Table not found`**
 - Check `DYNAMODB_TABLE` matches the deployed table name
 - Check `AWS_REGION` is correct
-- For LocalStack, verify `AWS_ENDPOINT_URL=http://localhost:4566`
+- For DynamoDB Local, verify `AWS_ENDPOINT_URL=http://localhost:8000` and that the container is running (`docker-compose up -d dynamodb-local`)
 
 **OpenAI `RateLimitError`**
 - Reduce `MAX_ARTICLES_PER_FEED` to limit API calls per run

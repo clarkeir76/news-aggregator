@@ -1,40 +1,6 @@
-version: '3.8'
-
 services:
-  # LocalStack for local AWS development
-  localstack:
-    image: localstack/localstack:latest
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
     ports:
-      - "4566:4566"
-    environment:
-      - DEBUG=1
-      - SERVICES=dynamodb,lambda,events,secretsmanager,cloudwatch,logs
-      - LAMBDA_EXECUTOR=docker
-      - DOCKER_HOST=unix:///var/run/docker.sock
-      - AWS_ACCESS_KEY_ID=test
-      - AWS_SECRET_ACCESS_KEY=test
-      - AWS_DEFAULT_REGION=us-east-1
-    volumes:
-      - "${TMPDIR}:/tmp/localstack"
-      - "/var/run/docker.sock:/var/run/docker.sock"
-
-  # Application container
-  app:
-    build: .
-    depends_on:
-      - localstack
-    environment:
-      - AWS_ENDPOINT_URL=http://localstack:4566
-      - AWS_REGION=us-east-1
-      - AWS_ACCESS_KEY_ID=test
-      - AWS_SECRET_ACCESS_KEY=test
-      - DYNAMODB_TABLE=news-articles
-      - LOG_LEVEL=DEBUG
-      - ENABLE_SLACK=false
-      - ENABLE_SUMMARIZATION=false
-    volumes:
-      - ./app:/var/task/app
-      - ./config:/opt/config
-    command: python -m app.lambda_handler
-    ports:
-      - "9000:8080"
+      - "8000:8000"
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
