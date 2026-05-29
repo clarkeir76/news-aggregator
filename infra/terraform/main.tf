@@ -79,6 +79,7 @@ module "eventbridge" {
   source               = "./modules/eventbridge"
   schedule_name        = "${local.name_prefix}-schedule"
   schedule_expression  = var.eventbridge_schedule
+  timezone             = var.eventbridge_timezone
   environment          = var.environment
   lambda_function_arn  = module.lambda.function_arn
   lambda_function_name = module.lambda.function_name

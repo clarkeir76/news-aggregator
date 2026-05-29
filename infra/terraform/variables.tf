@@ -34,7 +34,13 @@ variable "lambda_s3_key" {
 variable "eventbridge_schedule" {
   description = "EventBridge cron schedule expression"
   type        = string
-  default     = "cron(0 */6 * * ? *)"
+  default     = "cron(0 8,12,16 ? * MON-FRI *)"
+}
+
+variable "eventbridge_timezone" {
+  description = "IANA timezone for the EventBridge schedule"
+  type        = string
+  default     = "Europe/London"
 }
 
 # Application
@@ -80,7 +86,7 @@ variable "max_concurrent_summarizations" {
 
 variable "max_article_age_hours" {
   type    = number
-  default = 24
+  default = 60
 }
 
 variable "feed_timeout" {

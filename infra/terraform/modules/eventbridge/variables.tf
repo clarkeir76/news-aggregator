@@ -17,3 +17,9 @@ variable "lambda_function_arn" {
 variable "lambda_function_name" {
   type = string
 }
+
+variable "timezone" {
+  description = "IANA timezone for the schedule (e.g. Europe/London)"
+  type        = string
+  default     = "UTC"
+}

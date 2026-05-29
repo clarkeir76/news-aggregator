@@ -26,8 +26,9 @@ resource "aws_iam_role_policy" "invoke_lambda" {
 }
 
 resource "aws_scheduler_schedule" "main" {
-  name                = var.schedule_name
-  schedule_expression = var.schedule_expression
+  name                         = var.schedule_name
+  schedule_expression          = var.schedule_expression
+  schedule_expression_timezone = var.timezone
 
   flexible_time_window {
     mode = "OFF"
