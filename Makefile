@@ -1,4 +1,4 @@
-.PHONY: help install dev-install lint format test test-cov clean deploy
+.PHONY: help install dev-install lint format test test-local test-cov clean deploy
 
 help:
 	@echo "News Aggregator - Available Commands:"
@@ -6,7 +6,9 @@ help:
 	@echo "  make dev-install    - Install development dependencies"
 	@echo "  make lint           - Run linting and type checking"
 	@echo "  make format         - Format code with black"
-	@echo "  make test           - Run tests"
+	@echo "  make test           - Run unit tests (no Docker required)"
+	@echo "  make test-local     - Run all tests including DynamoDB Local integration tests"
+	@echo "                        (requires: docker-compose up -d dynamodb-local)"
 	@echo "  make test-cov       - Run tests with coverage"
 	@echo "  make clean          - Remove build artifacts and cache"
 	@echo "  make deploy         - Deploy infrastructure and application"
@@ -26,7 +28,10 @@ format:
 	black app/ tests/
 
 test:
-	pytest tests/ -v
+	pytest tests/ -v --ignore=tests/integration_test.py --ignore=tests/test_persistence_dynamo_local.py
+
+test-local:
+	pytest tests/ -v --ignore=tests/integration_test.py
 
 test-cov:
 	pytest tests/ -v --cov=app/src --cov-report=html --cov-report=term

@@ -201,8 +201,12 @@ Feeds are fetched in parallel using a thread pool (`MAX_CONCURRENT_FEEDS=10` by 
 Tests run automatically as a pre-commit hook. To run manually:
 
 ```bash
-# All tests
+# Unit tests only (no Docker required — always fast)
 make test
+
+# Unit tests + DynamoDB Local integration tests (requires Docker)
+# Start DynamoDB Local first: docker-compose up -d dynamodb-local
+make test-local
 
 # With coverage report
 make test-cov
@@ -210,6 +214,16 @@ make test-cov
 # Single module
 pytest tests/test_classification.py -v
 ```
+
+### Test layers
+
+| Layer | Command | Requires | What it catches |
+|---|---|---|---|
+| Unit tests | `make test` | Nothing | Logic bugs, interface contracts |
+| DynamoDB Local | `make test-local` | Docker | Real scan behaviour, serialisation round-trips, GSI key handling |
+| CI integration | Automatic on push | AWS (via pipeline) | Full Lambda pipeline, two-run deduplication |
+
+The pre-commit hook runs unit tests always, and also runs DynamoDB Local tests automatically if Docker is running.
 
 ## Project Structure
 
