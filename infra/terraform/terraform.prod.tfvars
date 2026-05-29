@@ -7,8 +7,13 @@ lambda_memory_size = 768
 
 eventbridge_schedule = "cron(0 */1 * * ? *)"
 
-enable_slack          = true
-enable_summarization  = true
-log_level             = "INFO"
-max_articles_per_feed = 50
-log_retention_days    = 90
+enable_slack                  = true
+enable_summarization          = true
+log_level                     = "INFO"
+max_articles_per_feed         = 50
+max_summary_length            = 300
+max_concurrent_feeds          = 10
+max_concurrent_summarizations = 5
+max_article_age_hours         = 24
+feed_timeout                  = 20
+log_retention_days            = 90

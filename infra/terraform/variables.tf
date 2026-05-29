@@ -63,6 +63,31 @@ variable "max_articles_per_feed" {
   default = 50
 }
 
+variable "max_summary_length" {
+  type    = number
+  default = 300
+}
+
+variable "max_concurrent_feeds" {
+  type    = number
+  default = 10
+}
+
+variable "max_concurrent_summarizations" {
+  type    = number
+  default = 5
+}
+
+variable "max_article_age_hours" {
+  type    = number
+  default = 24
+}
+
+variable "feed_timeout" {
+  type    = number
+  default = 20
+}
+
 variable "log_retention_days" {
   type    = number
   default = 30

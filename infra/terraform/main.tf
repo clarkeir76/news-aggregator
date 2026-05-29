@@ -49,21 +49,26 @@ module "lambda" {
   dynamodb_table_name = module.dynamodb.table_name
 
   environment_variables = {
-    DYNAMODB_TABLE               = module.dynamodb.table_name
-    OPENAI_API_KEY               = var.openai_api_key
-    OPENAI_MODEL                 = var.openai_model
-    ENABLE_SLACK                 = tostring(var.enable_slack)
-    ENABLE_SUMMARIZATION         = tostring(var.enable_summarization)
-    ENABLE_PERSISTENCE           = "true"
-    ENABLE_LLM_CLASSIFICATION    = "true"
-    LOG_LEVEL                    = var.log_level
-    MAX_ARTICLES_PER_FEED        = tostring(var.max_articles_per_feed)
-    MAX_CONCURRENT_FEEDS         = "10"
-    FEED_CONFIG_PATH             = "/var/task/config/feeds.yaml"
-    SLACK_WEBHOOK_TECH           = var.slack_webhook_tech
-    SLACK_WEBHOOK_AI             = var.slack_webhook_ai
-    SLACK_WEBHOOK_EDUCATION      = var.slack_webhook_education
-    SLACK_WEBHOOK_CYBER_SECURITY = var.slack_webhook_cyber_security
+    DYNAMODB_TABLE                = module.dynamodb.table_name
+    OPENAI_API_KEY                = var.openai_api_key
+    OPENAI_MODEL                  = var.openai_model
+    ENABLE_SLACK                  = tostring(var.enable_slack)
+    ENABLE_SUMMARIZATION          = tostring(var.enable_summarization)
+    ENABLE_PERSISTENCE            = "true"
+    ENABLE_LLM_CLASSIFICATION     = "true"
+    LOG_LEVEL                     = var.log_level
+    MAX_ARTICLES_PER_FEED         = tostring(var.max_articles_per_feed)
+    MAX_SUMMARY_LENGTH            = tostring(var.max_summary_length)
+    MAX_CONCURRENT_FEEDS          = tostring(var.max_concurrent_feeds)
+    MAX_CONCURRENT_SUMMARIZATIONS = tostring(var.max_concurrent_summarizations)
+    MAX_ARTICLE_AGE_HOURS         = tostring(var.max_article_age_hours)
+    FEED_TIMEOUT                  = tostring(var.feed_timeout)
+    FEED_CONFIG_PATH              = "/var/task/config/feeds.yaml"
+    LAST_RUN_FILE                 = "/tmp/.last_run"
+    SLACK_WEBHOOK_TECH            = var.slack_webhook_tech
+    SLACK_WEBHOOK_AI              = var.slack_webhook_ai
+    SLACK_WEBHOOK_EDUCATION       = var.slack_webhook_education
+    SLACK_WEBHOOK_CYBER_SECURITY  = var.slack_webhook_cyber_security
   }
 
   timeout     = var.lambda_timeout
