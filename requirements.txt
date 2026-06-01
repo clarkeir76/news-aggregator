@@ -1,4 +1,5 @@
 # Core dependencies
+qdrant-client==1.16.1
 python-dotenv==1.0.0
 feedparser==6.0.10
 trafilatura==1.12.2

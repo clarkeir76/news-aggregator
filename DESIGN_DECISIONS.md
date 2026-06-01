@@ -94,6 +94,16 @@ Key decisions and the reasoning behind them.
 
 ---
 
+## Vector embeddings for RAG (ENABLE_EMBEDDINGS)
+
+**Decision**: Article embeddings are generated using OpenAI `text-embedding-3-small` (1536 dimensions) from `title + summary` and stored in Qdrant. The step runs after summarisation so the full context is available. Point IDs are deterministic (UUID5 of article URL) so re-runs are idempotent.
+
+**Why title + summary rather than full content**: Summaries are already generated, concise, and represent the article well for semantic search. Full content would be expensive and often noisier.
+
+**Why Qdrant on ECS rather than DynamoDB**: DynamoDB doesn't support approximate nearest-neighbour search. Qdrant is purpose-built for vector search and will host the query interface. At this scale (few thousand articles with 14-day TTL) a single Qdrant container is sufficient.
+
+**Why feature-flagged**: The RAG query interface (chatbot UI) isn't built yet. The embedding step is additive with no risk to the existing pipeline, but is disabled in prod until the interface is ready and tested.
+
 ## Data retention
 
 **DynamoDB TTL**: Articles are automatically deleted 14 days after they are saved, via DynamoDB's TTL feature (`expiration_time` Unix timestamp). This prevents unbounded growth while keeping enough history for deduplication across a typical working week. Articles older than 14 days would never be surfaced as "new" anyway given `MAX_ARTICLE_AGE_HOURS=60`.

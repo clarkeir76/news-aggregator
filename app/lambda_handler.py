@@ -59,6 +59,9 @@ def lambda_handler(event, context):
             max_concurrent_summarizations=config.max_concurrent_summarizations,
             max_article_age_hours=config.max_article_age_hours,
             last_run_file=config.last_run_file,
+            enable_embeddings=config.enable_embeddings,
+            qdrant_url=config.qdrant_url,
+            qdrant_api_key=config.qdrant_api_key,
         )
 
         # Run pipeline

@@ -20,7 +20,8 @@ EventBridge Scheduler
         │
         ├── OpenAI API (summarisation)
         │
-        └── Slack Workflow Webhooks (one plain text digest per topic channel)
+        ├── Slack Workflow Webhooks (one plain text digest per topic channel)
+        └── Qdrant (vector embeddings for RAG — gated by ENABLE_EMBEDDINGS)
 ```
 
 ## Pipeline
@@ -64,7 +65,13 @@ Unique articles are written to DynamoDB. Optional — controlled by `ENABLE_PERS
 
 New articles are summarised concurrently (`MAX_CONCURRENT_SUMMARIZATIONS`, default 5) via OpenAI `gpt-4o-mini`. Each summary is 2–3 sentences and cached in DynamoDB.
 
-### Step 7: Slack Digests
+### Step 7b: Embeddings (optional, gated by ENABLE_EMBEDDINGS)
+
+After summarisation, article title + summary are embedded using OpenAI `text-embedding-3-small` and stored in Qdrant. Each point includes article metadata (url, title, topics, source, published_at, summary) for retrieval. Uses URL-derived UUID5 as point ID so re-runs are idempotent. Disabled in prod until the RAG query interface is built.
+
+To use locally: `docker-compose up -d qdrant` then set `ENABLE_EMBEDDINGS=true` in `.env`.
+
+### Step 8: Slack Digests
 
 One plain text message per topic channel via Slack Workflow Builder webhooks. Each message is sent as a `payload` string variable containing title, clickable URL, summary, and source/date for each article. Controlled by `ENABLE_SLACK` (`true` / `false` / `log`).
 
@@ -139,6 +146,9 @@ Terraform state is stored in S3 with environment-specific keys (`prod/terraform.
 | `ENABLE_SUMMARIZATION` | Enable OpenAI summarisation | `true` |
 | `ENABLE_PERSISTENCE` | Enable DynamoDB writes | `true` |
 | `ENABLE_LLM_CLASSIFICATION` | Use LLM to classify (falls back to keywords) | `true` |
+| `ENABLE_EMBEDDINGS` | Embed articles into Qdrant for RAG queries | `false` |
+| `QDRANT_URL` | Qdrant endpoint | `http://localhost:6333` |
+| `QDRANT_API_KEY` | Qdrant Cloud API key (leave blank for local) | unset |
 | `FEED_CONFIG_PATH` | Path to feeds.yaml | resolved relative to lambda_handler.py |
 | `LOG_LEVEL` | Logging level | `INFO` |
 | `LOG_FILE` | Write logs to file (local only) | `logs/run.log` |

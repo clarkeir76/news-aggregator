@@ -14,6 +14,7 @@ from .deduplication import Deduplicator
 from .persistence import DynamoDBStore
 from .summarization import Summarizer
 from .slack_notifier import SlackNotifier
+from .embedding_store import EmbeddingStore
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,9 @@ class NewsAggregator:
         slack_dry_run: bool = False,
         enable_persistence: bool = True,
         enable_llm_classification: bool = True,
+        enable_embeddings: bool = False,
+        qdrant_url: str = "http://localhost:6333",
+        qdrant_api_key: str = None,
         max_articles_per_feed: int = 50,
         max_concurrent_feeds: int = 10,
         max_concurrent_summarizations: int = 5,
@@ -84,6 +88,17 @@ class NewsAggregator:
 
         self.content_extractor = ContentExtractor()
         self.deduplicator = Deduplicator()
+
+        self.embedding_store = None
+        if enable_embeddings and openai_api_key:
+            try:
+                self.embedding_store = EmbeddingStore(
+                    qdrant_url=qdrant_url,
+                    openai_api_key=openai_api_key,
+                    qdrant_api_key=qdrant_api_key,
+                )
+            except Exception as e:
+                logger.warning(f"Embedding store unavailable, skipping: {e}")
 
         self.summarizer = None
         if enable_summarization and openai_api_key:
@@ -174,6 +189,18 @@ class NewsAggregator:
 
             # Step 7: Summarise (concurrent)
             summaries = self._summarise(new_articles)
+
+            # Step 7b: Store embeddings (title + summary → Qdrant, if enabled)
+            if self.embedding_store and new_articles:
+                embedded = sum(
+                    1
+                    for article, _ in new_articles
+                    if self.embedding_store.store(
+                        article, summaries.get(article.url, "")
+                    )
+                )
+                logger.info(f"Stored {embedded} embeddings in Qdrant")
+                self.stats["articles_embedded"] = embedded
 
             # Step 8: Notify
             if self.notifier and new_articles:

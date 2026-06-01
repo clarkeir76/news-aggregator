@@ -37,6 +37,11 @@ class Config:
         self.enable_llm_classification = (
             os.getenv("ENABLE_LLM_CLASSIFICATION", "true").lower() == "true"
         )
+        self.enable_embeddings = (
+            os.getenv("ENABLE_EMBEDDINGS", "false").lower() == "true"
+        )
+        self.qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
+        self.qdrant_api_key = os.getenv("QDRANT_API_KEY")
 
         # Limits
         self.max_articles_per_feed = int(os.getenv("MAX_ARTICLES_PER_FEED", "50"))
