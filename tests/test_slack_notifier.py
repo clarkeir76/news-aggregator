@@ -87,6 +87,51 @@ def test_build_digest_topic_label_formats_underscore():
     assert "Cyber Security Digest" in payload
 
 
+def test_build_digest_caps_at_max_articles():
+    """More than MAX_ARTICLES articles should be capped with an 'and N more' notice."""
+    articles = [
+        Article(
+            title=f"Article {i}",
+            source="s.com",
+            url=f"https://s.com/{i}",
+            published_at=datetime.utcnow(),
+            content="x",
+            topics=["tech"],
+        )
+        for i in range(SlackNotifier.MAX_ARTICLES + 5)
+    ]
+    payload = SlackNotifier._build_digest("tech", articles, {})["payload"]
+
+    # Header count still shows total, not capped count
+    assert f"{SlackNotifier.MAX_ARTICLES + 5} new articles" in payload
+    # Overflow notice present
+    assert "5 more article(s) not shown" in payload
+    # Only MAX_ARTICLES articles included
+    assert payload.count("https://s.com/") == SlackNotifier.MAX_ARTICLES
+
+
+def test_build_digest_truncates_at_max_chars():
+    """Payload exceeding MAX_PAYLOAD_CHARS should be truncated with a notice."""
+    articles = [
+        Article(
+            title=f"Article with a very long title number {i} that takes up space",
+            source="s.com",
+            url=f"https://s.com/{i}",
+            published_at=datetime.utcnow(),
+            content="x",
+            topics=["tech"],
+        )
+        for i in range(5)
+    ]
+    long_summary = "A " * 1000  # 2000 chars per article
+    summaries = {f"https://s.com/{i}": long_summary for i in range(5)}
+
+    payload = SlackNotifier._build_digest("tech", articles, summaries)["payload"]
+
+    assert len(payload) <= SlackNotifier.MAX_PAYLOAD_CHARS
+    assert "truncated" in payload
+
+
 # --- notify_digest ---
 
 

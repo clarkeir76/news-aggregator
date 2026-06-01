@@ -45,17 +45,25 @@ class SlackNotifier:
 
         return success
 
-    @staticmethod
-    def _build_digest(topic: str, articles: List[Article], summaries: dict) -> dict:
+    MAX_ARTICLES = 20
+    MAX_PAYLOAD_CHARS = 7800
+
+    @classmethod
+    def _build_digest(
+        cls, topic: str, articles: List[Article], summaries: dict
+    ) -> dict:
         """Build a plain text payload for a Slack Workflow Builder webhook."""
-        count = len(articles)
-        noun = "article" if count == 1 else "articles"
+        total = len(articles)
+        capped = articles[: cls.MAX_ARTICLES]
+        omitted = total - len(capped)
+
+        noun = "article" if total == 1 else "articles"
         topic_label = topic.replace("_", " ").title()
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-        lines = [f":newspaper: {topic_label} Digest — {count} new {noun} | {timestamp}"]
+        lines = [f":newspaper: {topic_label} Digest — {total} new {noun} | {timestamp}"]
 
-        for article in articles:
+        for article in capped:
             lines.append(f"\n{article.title}")
             all_urls = [article.url] + (article.related_urls or [])
             for url in all_urls:
@@ -68,7 +76,16 @@ class SlackNotifier:
                 f"source: {source} | {article.published_at.strftime('%Y-%m-%d %H:%M UTC')}"
             )
 
-        return {"payload": "\n".join(lines)}
+        if omitted:
+            lines.append(f"\n… and {omitted} more article(s) not shown.")
+
+        payload = "\n".join(lines)
+
+        if len(payload) > cls.MAX_PAYLOAD_CHARS:
+            payload = payload[: cls.MAX_PAYLOAD_CHARS - 60].rsplit("\n", 1)[0]
+            payload += "\n\n… truncated — digest exceeded Slack payload limit."
+
+        return {"payload": payload}
 
     @staticmethod
     def _send_webhook(webhook_url: str, message: dict) -> bool:

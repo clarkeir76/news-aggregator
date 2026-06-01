@@ -78,6 +78,12 @@ Key decisions and the reasoning behind them.
 
 ---
 
+## Slack digest payload limits
+
+**Decision**: Digests are capped at 20 articles per channel and the payload string is truncated to 7,800 characters. When the cap is exceeded an "… and N more" line is appended; when the character limit is hit a "… truncated" notice is added.
+
+**Why**: Slack Workflow Builder has an undocumented payload size limit (~8,000 chars). Oversized payloads are silently accepted (200 response) but never posted. This caused tech/AI/cyber digests to disappear on high-volume runs while education (fewer articles) still worked. The cap and truncation ensure messages always arrive.
+
 ## Slack Workflow Builder webhooks with plain text
 
 **Decision**: Use Slack Workflow Builder trigger URLs and send a flat `payload` string variable. No markdown or Block Kit formatting.
