@@ -40,6 +40,7 @@ class NewsAggregator:
         aws_endpoint_url: str = None,
         openai_api_key: str = None,
         slack_webhooks: dict = None,
+        enabled_topics: list = None,
         enable_summarization: bool = True,
         enable_slack: bool = True,
         slack_dry_run: bool = False,
@@ -81,9 +82,9 @@ class NewsAggregator:
         )
 
         self.classifier = (
-            LLMClassifier(api_key=openai_api_key)
+            LLMClassifier(api_key=openai_api_key, enabled_topics=enabled_topics)
             if enable_llm_classification and openai_api_key
-            else KeywordClassifier()
+            else KeywordClassifier(enabled_topics=enabled_topics)
         )
 
         self.content_extractor = ContentExtractor()

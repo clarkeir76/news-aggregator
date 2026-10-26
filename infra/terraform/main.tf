@@ -56,6 +56,7 @@ module "lambda" {
     ENABLE_SUMMARIZATION          = tostring(var.enable_summarization)
     ENABLE_PERSISTENCE            = "true"
     ENABLE_LLM_CLASSIFICATION     = "true"
+    ENABLED_TOPICS                = var.enabled_topics
     LOG_LEVEL                     = var.log_level
     MAX_ARTICLES_PER_FEED         = tostring(var.max_articles_per_feed)
     MAX_SUMMARY_LENGTH            = tostring(var.max_summary_length)

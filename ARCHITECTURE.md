@@ -146,6 +146,7 @@ Terraform state is stored in S3 with environment-specific keys (`prod/terraform.
 | `ENABLE_SUMMARIZATION` | Enable OpenAI summarisation | `true` |
 | `ENABLE_PERSISTENCE` | Enable DynamoDB writes | `true` |
 | `ENABLE_LLM_CLASSIFICATION` | Use LLM to classify (falls back to keywords) | `true` |
+| `ENABLED_TOPICS` | Comma-separated topics to classify and send (`tech`, `ai`, `cyber_security`, `education`). Unset = all topics. Disabled topics are never offered to the classifier, so their articles are dropped before content fetching | all |
 | `ENABLE_EMBEDDINGS` | Embed articles into Qdrant for RAG queries | `false` |
 | `QDRANT_URL` | Qdrant endpoint | `http://localhost:6333` |
 | `QDRANT_API_KEY` | Qdrant Cloud API key (leave blank for local) | unset |

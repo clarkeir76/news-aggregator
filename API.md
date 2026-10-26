@@ -66,6 +66,8 @@ Two classifiers are available, both implementing the `classify_and_filter` inter
 #### `LLMClassifier.classify_and_filter(articles: List[Article]) -> List[Article]`
 Classify and filter articles using a single batched LLM call. Discards articles that don't match any topic. Falls back to `KeywordClassifier` if the API call fails.
 
+**Constructor**: `LLMClassifier(api_key, model="gpt-4o-mini", enabled_topics=None)` — `enabled_topics` limits the topics offered to the LLM (`None` = all). Articles matching only disabled topics are discarded.
+
 **Parameters**:
 - `articles` (List[Article]): Articles with title and RSS summary populated
 
@@ -83,6 +85,8 @@ Classify articles using keyword matching. Keeps all articles (no articles are di
 
 **Parameters**:
 - `articles` (List[Article]): Articles to classify
+
+**Constructor**: `KeywordClassifier(enabled_topics=None)` — limits keyword matching to the given topics. If `tech` is not enabled, articles with no keyword match are dropped instead of defaulting to `tech`.
 
 **Returns**: All articles with `topics` set; defaults to `["tech"]` if no keywords match
 
@@ -291,6 +295,7 @@ Initialize the aggregator with all components.
 - `aws_region` (str): AWS region
 - `openai_api_key` (str, optional): OpenAI API key
 - `slack_webhooks` (dict, optional): Slack webhook URLs
+- `enabled_topics` (list[str], optional): Topics to classify; `None` = all topics
 - `enable_summarization` (bool): Enable OpenAI
 - `enable_slack` (bool): Enable Slack notifications
 - `max_articles_per_feed` (int): Articles per feed

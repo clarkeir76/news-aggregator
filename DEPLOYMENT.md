@@ -69,6 +69,8 @@ Creates an OIDC provider and IAM role so GitHub Actions can deploy to AWS withou
 | `TF_STATE_BUCKET` | Your S3 bucket name from Step 2 |
 | `DEPLOY_ENABLED` | Set to `true` to enable CD pipeline |
 
+The Lambda's `ENABLED_TOPICS` environment variable comes from the Terraform `enabled_topics` variable (default `ai`; comma-separated, empty = all topics). Only the listed topics are classified and sent to Slack.
+
 ---
 
 ## Step 4: Deploy

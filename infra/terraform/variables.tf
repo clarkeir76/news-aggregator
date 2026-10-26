@@ -49,6 +49,12 @@ variable "openai_model" {
   default = "gpt-4o-mini"
 }
 
+variable "enabled_topics" {
+  description = "Comma-separated topics to classify and send (tech, ai, cyber_security, education). Empty = all topics."
+  type        = string
+  default     = "ai"
+}
+
 variable "enable_slack" {
   type    = bool
   default = false

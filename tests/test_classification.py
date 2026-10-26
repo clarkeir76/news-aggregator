@@ -181,8 +181,8 @@ def test_topic_descriptions_contain_exclusion_criteria():
     assert "consumer" in TOPICS["tech"].lower()
 
 
-def test_cluster_prompt_is_strict(mock_openai):
-    """Clustering prompt must contain strictness rules to prevent over-clustering."""
+def test_cluster_prompt_rules(mock_openai):
+    """Clustering prompt must group same-event articles without an arbitrary cap."""
     import json
 
     mock_openai.chat.completions.create.return_value.choices[
@@ -199,9 +199,13 @@ def test_cluster_prompt_is_strict(mock_openai):
     prompt = mock_openai.chat.completions.create.call_args.kwargs["messages"][1][
         "content"
     ]
-    assert "exact same specific event" in prompt.lower() or "exact" in prompt.lower()
-    assert "when in doubt" in prompt.lower()
-    assert "maximum of 3" in prompt.lower() or "max" in prompt.lower()
+    # Must instruct the LLM to group same-event articles
+    assert "same specific event" in prompt.lower() or "exact" in prompt.lower()
+    # Must explicitly handle different headline angles on the same event
+    assert "angle" in prompt.lower() or "framing" in prompt.lower()
+    # Must NOT impose an arbitrary per-group article cap
+    assert "maximum of 3" not in prompt.lower()
+    assert "max" not in prompt.lower() or "maximum" not in prompt.lower()
 
 
 def test_cluster_stories_merges_same_story(mock_openai):
@@ -274,3 +278,68 @@ def test_llm_classifier_chunks_large_batches(mock_openai):
 
     # Should have made 2 API calls for BATCH_SIZE+1 articles
     assert mock_openai.chat.completions.create.call_count == 2
+
+
+# --- ENABLED_TOPICS ---
+
+
+def test_keyword_classifier_respects_enabled_topics():
+    c = KeywordClassifier(enabled_topics=["ai"])
+    article = make_article("Major Security Breach", "A new vulnerability was found")
+    assert c.classify(article) == []
+
+
+def test_keyword_classifier_drops_unmatched_when_tech_disabled():
+    c = KeywordClassifier(enabled_topics=["ai"])
+    articles = [
+        make_article("Weather today", "Sunny", url="https://example.com/1"),
+        make_article(
+            "New LLM released", "A large language model", url="https://example.com/2"
+        ),
+    ]
+    result = c.classify_and_filter(articles)
+    assert [a.url for a in result] == ["https://example.com/2"]
+    assert result[0].topics == ["ai"]
+
+
+def test_keyword_classifier_defaults_to_tech_when_tech_enabled():
+    c = KeywordClassifier(enabled_topics=["tech", "ai"])
+    assert c.classify(make_article("Weather today", "Sunny")) == ["tech"]
+
+
+def test_llm_classifier_prompt_only_lists_enabled_topics(mock_openai):
+    import json
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps({"1": ["ai"]})
+    classifier = LLMClassifier(api_key="test-key", enabled_topics=["ai"])
+    classifier.client = mock_openai
+
+    classifier.classify_and_filter([make_article("New LLM")])
+
+    prompt = mock_openai.chat.completions.create.call_args.kwargs["messages"][1][
+        "content"
+    ]
+    assert "- ai:" in prompt
+    for disabled in ("- tech:", "- cyber_security:", "- education:"):
+        assert disabled not in prompt
+
+
+def test_llm_classifier_discards_articles_matching_only_disabled_topics(mock_openai):
+    import json
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps({"1": ["tech"], "2": ["ai", "tech"]})
+    classifier = LLMClassifier(api_key="test-key", enabled_topics=["ai"])
+    classifier.client = mock_openai
+
+    articles = [
+        make_article("Cloud update", url="https://example.com/1"),
+        make_article("AI tooling", url="https://example.com/2"),
+    ]
+    result = classifier.classify_and_filter(articles)
+
+    assert [a.url for a in result] == ["https://example.com/2"]
+    assert result[0].topics == ["ai"]

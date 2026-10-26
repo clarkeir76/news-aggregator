@@ -3,7 +3,7 @@
 import json
 import logging
 import re
-from typing import List
+from typing import List, Optional
 import openai
 
 from .models import Article, Topic
@@ -53,10 +53,20 @@ class LLMClassifier:
     Falls back to KeywordClassifier if the API call fails.
     """
 
-    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "gpt-4o-mini",
+        enabled_topics: Optional[List[str]] = None,
+    ):
         self.client = openai.OpenAI(api_key=api_key)
         self.model = model
-        self._fallback = KeywordClassifier()
+        self.topics = {
+            topic: description
+            for topic, description in TOPICS.items()
+            if enabled_topics is None or topic in enabled_topics
+        }
+        self._fallback = KeywordClassifier(enabled_topics=enabled_topics)
 
     def cluster_stories(self, articles: List[Article]) -> List[Article]:
         """
@@ -81,12 +91,12 @@ class LLMClassifier:
 EXACT SAME specific news event, incident, or announcement.
 
 Rules:
-- Only group articles if they are clearly about the same specific event (e.g. the same breach,
-  the same product launch, the same report)
-- Do NOT group articles that merely share a topic or theme (e.g. two different AI security stories
-  are NOT the same story even if both involve AI and security)
-- Each group should have a maximum of 3 articles
-- When in doubt, keep articles separate — it is better to under-cluster than over-cluster
+- Group articles if they are clearly about the same specific event (e.g. the same lawsuit,
+  the same breach, the same product launch, the same report) — different headline angles or
+  framings of the same event belong in the same group
+- Do NOT group articles that merely share a topic or theme (e.g. two different AI lawsuits
+  are NOT the same story just because both involve AI and legal action)
+- When in doubt about whether articles share the same specific event, group them together
 - Every article number must appear in exactly one group
 
 Return JSON only: {{"groups": [[1, 4], [2], [3], [5, 6]]}}
@@ -177,7 +187,15 @@ Titles:
         indexed = {str(i + 1): article for i, article in enumerate(articles)}
 
         topic_descriptions = "\n".join(
-            f"- {topic}: {description}" for topic, description in TOPICS.items()
+            f"- {topic}: {description}" for topic, description in self.topics.items()
+        )
+        topic_names = list(self.topics)
+        example = json.dumps(
+            {
+                "1": topic_names[:1],
+                "2": topic_names[:2],
+                "3": [],
+            }
         )
 
         article_lines = []
@@ -202,7 +220,7 @@ Rules:
 - Exclude general news (politics, sport, entertainment, consumer lifestyle, weather)
 - Respond with valid JSON only, mapping article number to its matched topics (empty list = no match)
 
-Example: {{"1": ["tech"], "2": ["ai", "tech"], "3": [], "4": ["education", "cyber_security"]}}
+Example: {example}
 
 Articles:
 {chr(10).join(article_lines)}"""
@@ -227,9 +245,11 @@ Articles:
         result = json.loads(response.choices[0].message.content)
 
         return {
-            indexed[num].url: [t for t in topics if t in TOPICS]
+            indexed[num].url: [t for t in topics if t in self.topics]
             for num, topics in result.items()
-            if num in indexed and isinstance(topics, list) and topics
+            if num in indexed
+            and isinstance(topics, list)
+            and any(t in self.topics for t in topics)
         }
 
 
@@ -239,7 +259,8 @@ class KeywordClassifier:
     is disabled or unavailable.
     """
 
-    def __init__(self):
+    def __init__(self, enabled_topics: Optional[List[str]] = None):
+        self.enabled_topics = enabled_topics
         self.keywords = {
             Topic.AI.value: [
                 "artificial intelligence",
@@ -303,6 +324,12 @@ class KeywordClassifier:
                 "degree",
             ],
         }
+        if enabled_topics is not None:
+            self.keywords = {
+                topic: words
+                for topic, words in self.keywords.items()
+                if topic in enabled_topics
+            }
 
     def classify(self, article: Article) -> List[str]:
         text = f"{article.title} {article.content}".lower()
@@ -312,14 +339,22 @@ class KeywordClassifier:
                 if re.search(r"\b" + re.escape(keyword.lower()) + r"\b", text):
                     matched.append(topic)
                     break
-        return matched or [Topic.TECH.value]
+        if matched:
+            return matched
+        if self.enabled_topics is None or Topic.TECH.value in self.enabled_topics:
+            return [Topic.TECH.value]
+        return []
 
     def classify_and_filter(self, articles: List[Article]) -> List[Article]:
-        """Keyword classifier keeps all articles (no confidence in rejecting)."""
+        """
+        Keyword classifier keeps all articles (no confidence in rejecting),
+        unless enabled_topics excludes the tech fallback — then unmatched
+        articles are dropped.
+        """
         for article in articles:
             article.topics = self.classify(article)
             logger.debug(f"Classified '{article.title}' as {article.topics}")
-        return articles
+        return [a for a in articles if a.topics]
 
     def cluster_stories(self, articles: List[Article]) -> List[Article]:
         """Keyword classifier has no clustering — return articles unchanged."""

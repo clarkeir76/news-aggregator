@@ -84,6 +84,7 @@ python app/lambda_handler.py
 | `ENABLE_SUMMARIZATION` | Enable OpenAI summarisation | `true` |
 | `ENABLE_PERSISTENCE` | Enable DynamoDB storage | `true` |
 | `ENABLE_LLM_CLASSIFICATION` | Use LLM to classify and filter articles (falls back to keywords if disabled or no API key) | `true` |
+| `ENABLED_TOPICS` | Comma-separated topics to classify and send (`tech`, `ai`, `cyber_security`, `education`). Unset = all topics. Disabled topics are never offered to the classifier, so their articles are dropped before content fetching | all |
 | `FEED_CONFIG_PATH` | Path to feeds.yaml | resolved relative to lambda_handler.py |
 | `LOG_LEVEL` | Logging level | `INFO` |
 | `MAX_ARTICLES_PER_FEED` | Articles fetched per RSS feed per run | `50` |

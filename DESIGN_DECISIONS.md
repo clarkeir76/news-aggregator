@@ -14,11 +14,11 @@ Key decisions and the reasoning behind them.
 
 ---
 
-## Story clustering strictness
+## Story clustering: same-event grouping vs same-theme separation
 
-**Decision**: The clustering prompt explicitly requires articles to be about the *exact same specific event*, not merely the same topic or theme. Rules include: max 3 articles per cluster, when in doubt keep separate, do not cluster articles that share a theme but cover different incidents.
+**Decision**: The clustering prompt groups articles about the *exact same specific event* (same lawsuit, breach, launch, report) — including different headline angles or framings of that event — but does not group articles that merely share a topic or theme. There is no per-cluster article cap. When in doubt about whether two articles share the same specific event, the prompt instructs the LLM to group them.
 
-**Why**: Initial prompt ("same event, announcement, or development") caused the LLM to over-cluster — grouping thematically related articles (e.g. multiple different AI security stories) into a single digest entry with many unrelated URLs. Under-clustering is always preferable to over-clustering.
+**Why**: An earlier version had a "max 3 articles per group" cap and a "when in doubt, keep separate" rule. This caused stories covered by 4–6 outlets to be split into multiple clusters representing the same underlying event (e.g. 6 articles about a single Florida/OpenAI lawsuit producing two clusters with different headline angles). Fuzzy string matching cannot reliably catch these as duplicates post-clustering (different framings score ~52% similarity, while genuinely different stories on the same topic score ~68%), so the fix must be at the clustering stage. The "do not group thematically related articles" rule remains to prevent over-clustering.
 
 ## LLM classification with reader-specific criteria
 
@@ -146,6 +146,14 @@ Article records use `pk = ARTICLE#{uuid}`, system records use `pk = SYSTEM#confi
 **Why JSON**: Parseable by CloudWatch Logs Insights and any log aggregation tool. Field-based queries ("show me all ERROR logs from ingestion in the last hour") are possible without regex.
 
 **File logging locally**: Means the log file can be read directly without pasting terminal output. The file path is configurable via `LOG_FILE` and disabled automatically in Lambda (detected via `AWS_LAMBDA_FUNCTION_NAME`).
+
+---
+
+## Topic selection via ENABLED_TOPICS
+
+**Decision**: `ENABLED_TOPICS` (comma-separated, default all) restricts which topics are classified. Disabled topics are removed from the LLM prompt and keyword matching, so articles that only fit a disabled topic are discarded at classification.
+
+**Why**: Removing a Slack webhook only silences the digest — the pipeline would still spend LLM tokens, fetch full article text and persist articles for topics nobody reads. Filtering at classification keeps the "classify before fetching" rule. Re-enabling a topic is an env var change, not a code change. When `tech` is disabled the keyword fallback no longer defaults unmatched articles to `tech`; they are dropped.
 
 ---
 

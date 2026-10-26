@@ -65,7 +65,7 @@ class SlackNotifier:
 
         for article in capped:
             lines.append(f"\n{article.title}")
-            all_urls = [article.url] + (article.related_urls or [])
+            all_urls = ([article.url] + (article.related_urls or []))[:3]
             for url in all_urls:
                 lines.append(url)
             summary = summaries.get(article.url)

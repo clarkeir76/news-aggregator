@@ -3,6 +3,8 @@
 import os
 import logging
 
+from .models import Topic
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,6 +45,9 @@ class Config:
         self.qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
         self.qdrant_api_key = os.getenv("QDRANT_API_KEY")
 
+        # Topics — ENABLED_TOPICS is a comma-separated list; unset or empty = all topics
+        self.enabled_topics = self._parse_enabled_topics(os.getenv("ENABLED_TOPICS"))
+
         # Limits
         self.max_articles_per_feed = int(os.getenv("MAX_ARTICLES_PER_FEED", "50"))
         self.max_summary_length = int(os.getenv("MAX_SUMMARY_LENGTH", "300"))
@@ -53,6 +58,24 @@ class Config:
         )
         self.max_article_age_hours = int(os.getenv("MAX_ARTICLE_AGE_HOURS", "24"))
         self.last_run_file = os.getenv("LAST_RUN_FILE", "config/.last_run")
+
+    @staticmethod
+    def _parse_enabled_topics(raw):
+        """Parse ENABLED_TOPICS. Returns None (all topics) when unset or empty."""
+        requested = [t.strip().lower() for t in (raw or "").split(",") if t.strip()]
+        if not requested:
+            return None
+        known = Topic.all_topics()
+        unknown = [t for t in requested if t not in known]
+        if unknown:
+            logger.warning(
+                f"Ignoring unknown ENABLED_TOPICS values: {unknown} (valid: {known})"
+            )
+        enabled = [t for t in requested if t in known]
+        if not enabled:
+            logger.warning("ENABLED_TOPICS has no valid topics — enabling all topics")
+            return None
+        return enabled
 
     def validate(self) -> bool:
         """Validate required configuration"""

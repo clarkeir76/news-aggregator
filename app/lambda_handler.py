@@ -48,6 +48,7 @@ def lambda_handler(event, context):
             aws_endpoint_url=config.aws_endpoint_url,
             openai_api_key=config.openai_api_key,
             slack_webhooks=slack_webhooks,
+            enabled_topics=config.enabled_topics,
             enable_summarization=config.enable_summarization,
             enable_slack=config.enable_slack,
             slack_dry_run=config.slack_dry_run,
