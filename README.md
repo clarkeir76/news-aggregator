@@ -56,7 +56,7 @@ python3 -m venv venv
 source venv/bin/activate
 
 # Install dependencies
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 
 # Configure environment
 cp .env.example .env
@@ -251,7 +251,8 @@ news-aggregator/
 │   └── terraform/               # AWS infrastructure (Lambda, DynamoDB, EventBridge)
 ├── .github/workflows/           # CI/CD pipeline
 ├── .env.example                 # Environment variable reference
-├── requirements.txt
+├── requirements.txt             # Runtime deps only (packaged into the Lambda zip)
+├── requirements-dev.txt         # Runtime + boto3 + test/lint tools (local and CI)
 └── Makefile                     # Common commands
 ```
 

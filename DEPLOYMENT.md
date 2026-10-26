@@ -114,7 +114,7 @@ terraform plan \
 terraform apply -auto-approve [same vars as above]
 ```
 
-**Note**: For manual deploys you need to first build and upload the Lambda package:
+**Note**: For manual deploys you need to first build and upload the Lambda package. Install from `requirements.txt` only (runtime deps — boto3 comes from the Lambda runtime and dev tools are excluded) because the unzipped package must stay under Lambda's 250 MB limit:
 ```bash
 mkdir -p lambda_build
 pip install -r requirements.txt -t lambda_build/

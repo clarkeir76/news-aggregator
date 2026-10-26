@@ -157,6 +157,14 @@ Article records use `pk = ARTICLE#{uuid}`, system records use `pk = SYSTEM#confi
 
 ---
 
+## Lambda package size: split requirements
+
+**Decision**: `requirements.txt` holds runtime dependencies only. `requirements-dev.txt` adds boto3/botocore and the test/lint tools for local and CI use. The Lambda zip is built from `requirements.txt`.
+
+**Why**: Adding `qdrant-client` (which pulls in grpcio, numpy and pydantic) pushed the unzipped package past Lambda's 250 MB limit, so CI failed at Terraform Apply and nothing deployed after 1 June 2026. The package had also been carrying mypy, black, flake8, pytest and a pinned boto3 that the Lambda runtime already provides. If the package approaches the limit again, make `qdrant-client` an optional import or move to a container image.
+
+---
+
 ## Feature flags via environment variables
 
 **Decision**: All major features (`ENABLE_SLACK`, `ENABLE_SUMMARIZATION`, `ENABLE_PERSISTENCE`, `ENABLE_LLM_CLASSIFICATION`) are controlled by environment variables with sensible defaults.

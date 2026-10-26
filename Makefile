@@ -14,10 +14,9 @@ help:
 	@echo "  make deploy         - Deploy infrastructure and application"
 
 install:
-	pip install -r requirements.txt
+	pip install -r requirements-dev.txt
 
 dev-install: install
-	pip install pytest pytest-cov pytest-mock black flake8 mypy
 
 lint:
 	black --check app/ tests/
