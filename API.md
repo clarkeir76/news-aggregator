@@ -66,7 +66,7 @@ Two classifiers are available, both implementing the `classify_and_filter` inter
 #### `LLMClassifier.classify_and_filter(articles: List[Article]) -> List[Article]`
 Classify and filter articles using a single batched LLM call. Discards articles that don't match any topic. Falls back to `KeywordClassifier` if the API call fails.
 
-**Constructor**: `LLMClassifier(api_key, model="gpt-4o-mini", enabled_topics=None)` — `enabled_topics` limits the topics offered to the LLM (`None` = all). Articles matching only disabled topics are discarded.
+**Constructor**: `LLMClassifier(api_key, model="gpt-4o-mini", enabled_topics=None, min_significance=4, cluster_model=None, classify_model=None)` — `enabled_topics` limits the topics offered to the LLM (`None` = all). Articles matching only disabled topics are discarded. The LLM returns `{"<n>": {"topics": [...], "significance": 1-5}}` per article; articles scoring below `min_significance` are discarded. A bare topic list with no score is accepted and kept. The score is stored on `Article.significance`. `classify_model` is used for classification and scoring only. `classify_and_filter` no longer applies the threshold: it returns every topic match with `significance` set, and `filter_by_significance(articles)` (call it after `cluster_stories`) drops stories whose best score is below `min_significance`; `KeywordClassifier.filter_by_significance` is a no-op. `cluster_model` is used for `cluster_stories` only (`None` = same as `model`); the clustering prompt includes a 200-character summary snippet per article, and the primary article of a cluster inherits the highest significance score and de-duplicated `related_urls` (never including its own URL).
 
 **Parameters**:
 - `articles` (List[Article]): Articles with title and RSS summary populated
@@ -401,6 +401,8 @@ DYNAMODB_TABLE = "news-articles"
 # OpenAI
 OPENAI_API_KEY = "sk-..."
 OPENAI_MODEL = "gpt-4o-mini"
+CLUSTER_MODEL = ""  # optional; empty = use OPENAI_MODEL
+CLASSIFY_MODEL = ""  # optional; empty = use OPENAI_MODEL
 
 # Slack
 SLACK_WEBHOOK_TECH = "https://hooks.slack.com/..."

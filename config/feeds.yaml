@@ -3,22 +3,22 @@
 
 feeds:
 
-  # General news
-  - url: "https://feeds.bbci.co.uk/news/rss.xml"
-  - url: "https://www.theguardian.com/world/rss"
-  - url: "https://feeds.npr.org/1001/rss.xml"
-  - url: "https://www.aljazeera.com/xml/rss/all.xml"
-  - url: "https://rss.dw.com/xml/rss-en-all"
-  - url: "https://www.france24.com/en/rss"
-  - url: "https://feeds.skynews.com/feeds/rss/home.xml"
-  - url: "https://www.cbc.ca/webfeed/rss/rss-world"
-  - url: "https://www3.nhk.or.jp/rss/news/cat0.xml"
-  - url: "https://www.channelnewsasia.com/rssfeeds/8395986"
-  - url: "https://www.rte.ie/feeds/rss/?index=/news/"
-  - url: "https://www.sbs.com.au/news/feed"
-  - url: "https://www.abc.net.au/news/feed/51120/rss.xml"
-  - url: "https://www.pbs.org/newshour/feeds/rss/headlines"
-  - url: "https://www.cbsnews.com/latest/rss/main"
+  # General news — disabled: almost never AI-centred, adds classification noise/cost
+  # - url: "https://feeds.bbci.co.uk/news/rss.xml"
+  # - url: "https://www.theguardian.com/world/rss"
+  # - url: "https://feeds.npr.org/1001/rss.xml"
+  # - url: "https://www.aljazeera.com/xml/rss/all.xml"
+  # - url: "https://rss.dw.com/xml/rss-en-all"
+  # - url: "https://www.france24.com/en/rss"
+  # - url: "https://feeds.skynews.com/feeds/rss/home.xml"
+  # - url: "https://www.cbc.ca/webfeed/rss/rss-world"
+  # - url: "https://www3.nhk.or.jp/rss/news/cat0.xml"
+  # - url: "https://www.channelnewsasia.com/rssfeeds/8395986"
+  # - url: "https://www.rte.ie/feeds/rss/?index=/news/"
+  # - url: "https://www.sbs.com.au/news/feed"
+  # - url: "https://www.abc.net.au/news/feed/51120/rss.xml"
+  # - url: "https://www.pbs.org/newshour/feeds/rss/headlines"
+  # - url: "https://www.cbsnews.com/latest/rss/main"
   # - url: "https://www.reutersagency.com/feed/?best-topics=all&post_type=best"  # FAIL: 404
   # - url: "https://apnews.com/rss"  # FAIL: 404
 
@@ -43,7 +43,7 @@ feeds:
   - url: "https://blog.google/technology/ai/rss/"
   - url: "https://huggingface.co/blog/feed.xml"
   - url: "https://www.infoq.com/feed/ai-ml-data-eng/"
-  - url: "https://rss.arxiv.org/rss/cs.AI"
+  # - url: "https://rss.arxiv.org/rss/cs.AI"  # disabled: individual papers, too high-volume/niche
   - url: "https://blogs.nvidia.com/feed/"
   # - url: "https://www.anthropic.com/news/rss.xml"  # FAIL: 404
   # - url: "https://deepmind.google/discover/blog/rss.xml"  # FAIL: 404

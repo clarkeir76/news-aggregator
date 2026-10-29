@@ -16,15 +16,35 @@ Key decisions and the reasoning behind them.
 
 ## Story clustering: same-event grouping vs same-theme separation
 
-**Decision**: The clustering prompt groups articles about the *exact same specific event* (same lawsuit, breach, launch, report) — including different headline angles or framings of that event — but does not group articles that merely share a topic or theme. There is no per-cluster article cap. When in doubt about whether two articles share the same specific event, the prompt instructs the LLM to group them.
+**Decision**: The clustering prompt groups articles about the *exact same specific event* (same lawsuit, breach, launch, report) — including different headline angles or framings of that event — but does not group articles that merely share a topic or theme. There is no per-cluster article cap. The prompt requires the articles to report the same specific launch, incident, announcement, result or report: sharing a company, person or theme is not enough (two articles that both mention Anthropic are different stories). When unsure the LLM keeps them separate, but clear event matches are grouped whatever the framing or article type.
 
-**Why**: An earlier version had a "max 3 articles per group" cap and a "when in doubt, keep separate" rule. This caused stories covered by 4–6 outlets to be split into multiple clusters representing the same underlying event (e.g. 6 articles about a single Florida/OpenAI lawsuit producing two clusters with different headline angles). Fuzzy string matching cannot reliably catch these as duplicates post-clustering (different framings score ~52% similarity, while genuinely different stories on the same topic score ~68%), so the fix must be at the clustering stage. The "do not group thematically related articles" rule remains to prevent over-clustering.
+**Why**: An earlier version had a "max 3 articles per group" cap and a "when in doubt, keep separate" rule. This caused stories covered by 4–6 outlets to be split into multiple clusters representing the same underlying event (e.g. 6 articles about a single Florida/OpenAI lawsuit producing two clusters with different headline angles). Fuzzy string matching cannot reliably catch these as duplicates post-clustering (different framings score ~52% similarity, while genuinely different stories on the same topic score ~68%), so the fix must be at the clustering stage. The "do not group thematically related articles" rule remains to prevent over-clustering. A later version of the "when in doubt, group" rule combined with summary snippets and an "analysis counts as the same story" rule over-merged on a 60-article run (merging a Mistral cybersecurity model release into a Google Gemini story, and an unrelated Pentagon AI-agent story into a Claude exploit story). Because the significance threshold is applied after clustering using the best score in each cluster, a wrong merge also lifts weak articles into the digest, so a shared-event requirement was added (a first attempt at "same company" still merged an Anthropic research story with an Anthropic hiring story), RSS summary snippets are stripped of HTML before use, and multi-member clusters are logged at INFO. Clustering and scoring were judged markedly better on `gpt-4.1` than `gpt-4o-mini`, so set `CLASSIFY_MODEL` and `CLUSTER_MODEL` to it in production.
 
 ## LLM classification with reader-specific criteria
 
-**Decision**: The classification prompt includes explicit include/exclude criteria per topic, calibrated for a UK software engineering leader in the post-18 education sector. Topic descriptions define not just what to include but what to actively exclude (e.g. consumer tech deals for `tech`, primary school stories for `education`). The system prompt identifies the reader role so the LLM can make relevance judgements at the right level.
+**Decision**: The classification prompt includes explicit include/exclude criteria per topic, originally calibrated for a UK software engineering leader in the post-18 education sector (see "Strategic significance scoring" below for the current persona). Topic descriptions define not just what to include but what to actively exclude (e.g. consumer tech deals for `tech`, primary school stories for `education`). The system prompt identifies the reader role so the LLM can make relevance judgements at the right level.
 
 **Why**: Generic topic descriptions (e.g. "technology, software, startups") produce too many irrelevant articles (consumer gadget deals, gaming, school disaster stories). Explicit exclusion criteria significantly improve signal-to-noise without needing per-feed topic pre-assignment.
+
+## Strategic significance scoring and AI-as-subject rule
+
+**Decision**: The LLM classifier returns a 1–5 significance score alongside topics, and articles below `MIN_SIGNIFICANCE` (default 4) are discarded. The `ai` topic description is written around strategic significance (frontier model releases, breakthroughs, major company moves, policy, large-scale impact; AI in education only when strategic) and requires AI to be the article's primary subject. Incremental updates, individual papers, anecdotes and stories where AI or an AI executive is incidental are explicitly excluded. The reader persona is a senior technology leader in education wanting what peers will be discussing. General-news feeds and the arXiv cs.AI feed are disabled.
+
+**Why**: A topic-match yes/no with "cast a wide net" produced niche and incremental stories, and let through stories that merely involved someone in AI (e.g. espionage targeting a chip company CEO). A score makes selectivity tunable through an env var rather than by rewording prompts. The "classify before fetching" rule is unchanged — the score comes from the same batch call. The keyword fallback has no score and is unaffected.
+
+A first dry run with only "4 or above" kept 30 stories a day, including webinar promotions and vendor tool announcements, because small models inflate scores. The prompt now calibrates harshly (most matches score 2-3, about 1 in 20 scores 4-5, and webinars, promotion, vendor announcements, opinion, case studies and non-AI partnerships score at most 2), and every kept/dropped decision with its score is logged at INFO so the threshold can be tuned from data.
+
+The same dry run showed per-article scores varied between outlets covering the same story (e.g. 5, 5 and 4 for one model launch), and a threshold applied per article dropped the lower-scoring member before it could join its cluster. The threshold is therefore applied after clustering, on the highest score in each cluster (`filter_by_significance`), and `CLASSIFY_MODEL` allows a stronger model for scoring consistency. Classification still happens before content fetching; clustering now runs on all topic-matched articles (roughly 80 titles rather than ~30), which remains a single cheap call.
+
+---
+
+## Clustering inputs, URL pre-dedupe and a separate clustering model
+
+**Decision**: (1) Exact-URL repeats are removed straight after ingestion, before classification. (2) The clustering prompt includes a 200-character RSS summary snippet per article and states that analysis, review or opinion pieces about the same launch or announcement belong in the same group as the news reports. (3) `CLUSTER_MODEL` optionally sets a different model for clustering only. (4) `OPENAI_MODEL` is now actually passed to the classifier and summariser (previously it was read into config but ignored).
+
+**Why**: The same article arriving via two overlapping feeds (e.g. TechCrunch's main and AI feeds) was classified twice, clustered with itself and shown as "multiple sources" with a repeated link. Title-only clustering missed same-story pieces with different framing (a model announcement vs a "looks like a diamond in the rough" review); snippets give shared names and products to match on. Clustering is one call per run, so a stronger model there is cheap. Cluster members' significance scores are merged (max) so the digest can be ordered by importance.
+
+---
 
 ## LLM classification with keyword fallback
 
@@ -80,7 +100,7 @@ Key decisions and the reasoning behind them.
 
 ## Slack digest payload limits
 
-**Decision**: Digests are capped at 20 articles per channel and the payload string is truncated to 7,800 characters. When the cap is exceeded an "… and N more" line is appended; when the character limit is hit a "… truncated" notice is added.
+**Decision**: Digests are capped at 10 articles per channel (ordered by significance score, highest first, so cap and truncation drop the least significant stories) and the payload string is truncated to 7,800 characters. When the cap is exceeded an "… and N more" line is appended; when the character limit is hit a "… truncated" notice is added.
 
 **Why**: Slack Workflow Builder has an undocumented payload size limit (~8,000 chars). Oversized payloads are silently accepted (200 response) but never posted. This caused tech/AI/cyber digests to disappear on high-volume runs while education (fewer articles) still worked. The cap and truncation ensure messages always arrive.
 

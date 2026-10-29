@@ -223,3 +223,63 @@ def test_send_webhook_returns_false_on_request_exception(mocker):
         side_effect=requests.RequestException("timeout"),
     )
     assert SlackNotifier._send_webhook("https://hooks.slack.com/x", {}) is False
+
+
+def _scored(title, url, significance, **kwargs):
+    return Article(
+        title=title,
+        source="s.com",
+        url=url,
+        published_at=datetime(2024, 1, 15, 10, 0, 0),
+        content="x",
+        topics=["ai"],
+        significance=significance,
+        **kwargs,
+    )
+
+
+def test_build_digest_orders_by_significance():
+    articles = [
+        _scored("Minor", "https://s.com/minor", 4),
+        _scored("Major", "https://s.com/major", 5),
+        _scored("Unscored", "https://s.com/none", None),
+    ]
+    payload = SlackNotifier._build_digest("ai", articles, {})["payload"]
+
+    assert payload.index("Major") < payload.index("Minor") < payload.index("Unscored")
+
+
+def test_build_digest_cap_drops_least_significant():
+    articles = [
+        _scored(f"Story {i}", f"https://s.com/{i}", 4)
+        for i in range(SlackNotifier.MAX_ARTICLES)
+    ]
+    articles.append(_scored("Top story", "https://s.com/top", 5))
+    payload = SlackNotifier._build_digest("ai", articles, {})["payload"]
+
+    assert "Top story" in payload
+    assert "1 more article(s) not shown" in payload
+
+
+def test_build_digest_same_url_is_not_multiple_sources():
+    article = _scored(
+        "One article",
+        "https://s.com/1",
+        5,
+        related_urls=["https://s.com/1"],
+    )
+    payload = SlackNotifier._build_digest("ai", [article], {})["payload"]
+
+    assert payload.count("https://s.com/1") == 1
+    assert "source: s.com" in payload
+    assert "multiple sources" not in payload
+
+
+def test_build_digest_distinct_related_urls_are_multiple_sources():
+    article = _scored(
+        "One story", "https://s.com/1", 5, related_urls=["https://t.com/1"]
+    )
+    payload = SlackNotifier._build_digest("ai", [article], {})["payload"]
+
+    assert "https://t.com/1" in payload
+    assert "source: multiple sources" in payload

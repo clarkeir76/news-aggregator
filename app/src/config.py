@@ -22,6 +22,10 @@ class Config:
         # OpenAI Configuration
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
         self.openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        # Optional stronger model for story clustering only; unset = use openai_model
+        self.cluster_model = os.getenv("CLUSTER_MODEL") or None
+        # Optional stronger model for classification + significance scoring only
+        self.classify_model = os.getenv("CLASSIFY_MODEL") or None
 
         # Logging
         self.log_level = os.getenv("LOG_LEVEL", "INFO")
@@ -47,6 +51,9 @@ class Config:
 
         # Topics — ENABLED_TOPICS is a comma-separated list; unset or empty = all topics
         self.enabled_topics = self._parse_enabled_topics(os.getenv("ENABLED_TOPICS"))
+
+        # Classification — minimum 1-5 significance score for an article to be kept
+        self.min_significance = int(os.getenv("MIN_SIGNIFICANCE", "4"))
 
         # Limits
         self.max_articles_per_feed = int(os.getenv("MAX_ARTICLES_PER_FEED", "50"))
