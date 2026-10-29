@@ -360,7 +360,7 @@ def _classify_with_response(mock_openai, payload, **kwargs):
         make_article("Major model release", url="https://example.com/1"),
         make_article("Minor feature tweak", url="https://example.com/2"),
     ]
-    return classifier.classify_and_filter(articles)
+    return classifier.filter_by_significance(classifier.classify_and_filter(articles))
 
 
 def test_llm_classifier_drops_articles_below_min_significance(mock_openai):
@@ -525,3 +525,193 @@ def test_llm_classifier_sets_significance_on_articles(mock_openai):
         },
     )
     assert [a.significance for a in result] == [5, 4]
+
+
+def test_llm_classifier_logs_kept_and_dropped_scores(mock_openai, caplog):
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="app.src.classification"):
+        _classify_with_response(
+            mock_openai,
+            {
+                "1": {"topics": ["ai"], "significance": 5},
+                "2": {"topics": ["ai"], "significance": 2},
+            },
+        )
+    messages = " ".join(r.getMessage() for r in caplog.records)
+    assert "Kept (significance 5): Major model release" in messages
+    assert "Dropped (significance 2 < 4): Minor feature tweak" in messages
+
+
+def test_classifier_prompt_calibrates_scores_harshly(mock_openai):
+    import json
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps({"1": {"topics": ["ai"], "significance": 5}})
+    classifier = LLMClassifier(api_key="test-key", enabled_topics=["ai"])
+    classifier.client = mock_openai
+    classifier.classify_and_filter([make_article("New LLM")])
+
+    prompt = mock_openai.chat.completions.create.call_args.kwargs["messages"][1][
+        "content"
+    ]
+    assert "webinars" in prompt
+    assert "1 in 20" in prompt
+
+
+def test_classify_and_filter_keeps_low_scores_for_later_filtering(mock_openai):
+    import json
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps(
+        {
+            "1": {"topics": ["ai"], "significance": 5},
+            "2": {"topics": ["ai"], "significance": 2},
+        }
+    )
+    classifier = LLMClassifier(api_key="test-key", enabled_topics=["ai"])
+    classifier.client = mock_openai
+    result = classifier.classify_and_filter(
+        [
+            make_article("A", url="https://example.com/1"),
+            make_article("B", url="https://example.com/2"),
+        ]
+    )
+
+    assert [a.significance for a in result] == [5, 2]
+
+
+def test_story_passes_threshold_on_its_best_scoring_article(mock_openai):
+    """A 4-scoring review clustered with a 5-scoring announcement is kept."""
+    import json
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps({"groups": [[1, 2], [3]]})
+    articles = [
+        make_article("Model launch", "long content here", "https://a.com/1"),
+        make_article("Model review", "x", "https://b.com/1"),
+        make_article("Minor tool", "y", "https://c.com/1"),
+    ]
+    articles[0].significance = 5
+    articles[1].significance = 4
+    articles[2].significance = 3
+    classifier = LLMClassifier(api_key="test-key", min_significance=5)
+    clustered = classifier.cluster_stories(articles)
+    result = classifier.filter_by_significance(clustered)
+
+    assert len(result) == 1
+    assert result[0].significance == 5
+    assert result[0].related_urls == ["https://b.com/1"]
+
+
+def test_filter_by_significance_keeps_unscored_articles():
+    classifier = LLMClassifier(api_key="test-key", min_significance=4)
+    unscored = make_article("Keyword match", url="https://a.com/1")
+    assert classifier.filter_by_significance([unscored]) == [unscored]
+
+
+def test_keyword_classifier_filter_by_significance_is_noop():
+    articles = [make_article("A")]
+    assert KeywordClassifier().filter_by_significance(articles) == articles
+
+
+def test_classify_model_used_for_classification_only(mock_openai):
+    import json
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps({"1": {"topics": ["ai"], "significance": 5}})
+    classifier = LLMClassifier(
+        api_key="test-key",
+        model="gpt-4o-mini",
+        classify_model="gpt-4.1",
+        enabled_topics=["ai"],
+    )
+    classifier.client = mock_openai
+    classifier.classify_and_filter([make_article("New LLM")])
+
+    assert mock_openai.chat.completions.create.call_args.kwargs["model"] == "gpt-4.1"
+    assert classifier.cluster_model == "gpt-4o-mini"
+
+
+def test_classify_model_defaults_to_main_model():
+    classifier = LLMClassifier(api_key="test-key", model="gpt-4o")
+    assert classifier.classify_model == "gpt-4o"
+
+
+def test_cluster_prompt_keeps_different_subjects_separate(mock_openai):
+    import json
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps({"groups": [[1], [2]]})
+    articles = [
+        make_article("Story A", url="https://a.com/1"),
+        make_article("Story B", url="https://b.com/1"),
+    ]
+    LLMClassifier(api_key="test-key").cluster_stories(articles)
+
+    prompt = mock_openai.chat.completions.create.call_args.kwargs["messages"][1][
+        "content"
+    ]
+    assert "NOT enough" in prompt
+    assert "keep them separate" in prompt
+    assert "group them together" not in prompt
+
+
+def test_cluster_logs_multi_member_clusters(mock_openai, caplog):
+    import json
+    import logging
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps({"groups": [[1, 2], [3]]})
+    articles = [
+        make_article("Launch", "long content", "https://a.com/1"),
+        make_article("Review", "x", "https://b.com/1"),
+        make_article("Other", "y", "https://c.com/1"),
+    ]
+    with caplog.at_level(logging.INFO, logger="app.src.classification"):
+        LLMClassifier(api_key="test-key").cluster_stories(articles)
+
+    messages = [r.getMessage() for r in caplog.records]
+    assert any(
+        m.startswith("Cluster:") and "Launch" in m and "Review" in m for m in messages
+    )
+    assert not any("Other" in m and m.startswith("Cluster:") for m in messages)
+
+
+def test_plain_text_strips_html_and_entities():
+    from app.src.classification import _plain_text
+
+    raw = "<p>Google &amp; partners</p> <p>The post <a href='x'>link</a> appeared</p>"
+    assert _plain_text(raw) == "Google & partners The post link appeared"
+    assert _plain_text(None) == ""
+
+
+def test_cluster_snippet_has_no_html(mock_openai):
+    import json
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps({"groups": [[1], [2]]})
+    articles = [
+        make_article("A", "<p>Gemini 4 Carbon <b>launch</b></p>", "https://a.com/1"),
+        make_article("B", "plain", "https://b.com/1"),
+    ]
+    LLMClassifier(api_key="test-key").cluster_stories(articles)
+
+    prompt = mock_openai.chat.completions.create.call_args.kwargs["messages"][1][
+        "content"
+    ]
+    assert "Summary: Gemini 4 Carbon launch" in prompt
+    assert "<p>" not in prompt
+
+
+def test_ai_topic_includes_market_moving_business_news():
+    from app.src.classification import TOPICS
+
+    assert "market-moving AI business news" in TOPICS["ai"]

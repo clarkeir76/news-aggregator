@@ -53,6 +53,7 @@ module "lambda" {
     OPENAI_API_KEY                = var.openai_api_key
     OPENAI_MODEL                  = var.openai_model
     CLUSTER_MODEL                 = var.cluster_model
+    CLASSIFY_MODEL                = var.classify_model
     ENABLE_SLACK                  = tostring(var.enable_slack)
     ENABLE_SUMMARIZATION          = tostring(var.enable_summarization)
     ENABLE_PERSISTENCE            = "true"

@@ -36,15 +36,17 @@ Articles older than the cutoff are discarded here before anything else runs. The
 - `now - MAX_ARTICLE_AGE_HOURS` (default 60h — hard cap, covers weekend gaps)
 - the timestamp of the last successful run (stored in `config/.last_run` locally or `/tmp/.last_run` in Lambda, with DynamoDB as the authoritative source when persistence is enabled)
 
-This means hourly runs only process the last hour's articles. If the pipeline hasn't run for 3 days it still caps at 24 hours.
+This means each run only processes articles published since the previous run (about 4 hours for the 08:00 and 12:00 runs, 16 hours for the 16:00 run, and up to `MAX_ARTICLE_AGE_HOURS` on Monday morning). If the pipeline hasn't run for longer than that, the age cap applies.
 
 ### Step 2: LLM Classification, Filter and Story Clustering
 
-All article titles and summaries are sent to OpenAI in a **single batch API call**. The LLM returns topic assignments (`tech`, `ai`, `cyber_security`, `education`) and a 1–5 significance score per article. Articles that don't match any topic (general news, sport, weather etc.), or score below `MIN_SIGNIFICANCE` (default 4), are discarded. The `ai` topic requires AI to be the article's main subject, not an incidental mention.
+All article titles and summaries are sent to OpenAI in a **single batch API call**. The LLM returns topic assignments (`tech`, `ai`, `cyber_security`, `education`) and a 1–5 significance score per article. Articles that don't match any topic (general news, sport, weather etc.) are discarded. The score threshold is applied after clustering (see below): a story is kept if its best-scoring article is at or above `MIN_SIGNIFICANCE` (default 4). `CLASSIFY_MODEL` optionally sets the model for this call. The `ai` topic requires AI to be the article's main subject, not an incidental mention.
 
 Before classification, articles with a repeated URL (the same article arriving via overlapping feeds, e.g. a site's main and AI category feeds) are removed so they are not classified or clustered twice.
 
 A second LLM call then **clusters same-story articles** — multiple outlets covering the same event are merged into one entry. The prompt sees each title plus the first 200 characters of its RSS summary, and treats analysis/review pieces about an announcement as the same story as the announcement. It uses `CLUSTER_MODEL` if set. The richest article (most content) becomes the primary and inherits the highest significance score in the cluster; other URLs are stored as `related_urls`. Slack shows all source URLs under a single summary, labelled "multiple sources" only when there is more than one distinct URL.
+
+After clustering, stories whose highest significance score is below `MIN_SIGNIFICANCE` are dropped (`filter_by_significance`). Judging the story by its best article means one outlet scoring a piece lower than another doesn't lose the story.
 
 The Slack digest is ordered by significance score (highest first) and capped at 10 articles, so any cap or payload truncation drops the least significant stories.
 
@@ -113,7 +115,7 @@ fetched_at       When this version was fetched
 | Component | Purpose | Config |
 |---|---|---|
 | Lambda | Runs the pipeline | Python 3.12, 512MB, 5-min timeout |
-| EventBridge Scheduler | Triggers Lambda on schedule | Every hour (prod) |
+| EventBridge Scheduler | Triggers Lambda on schedule | 08:00, 12:00, 16:00 Europe/London, Mon–Fri (prod) |
 | DynamoDB | Article storage | PAY_PER_REQUEST, PITR in prod, TTL 14 days |
 | S3 | Lambda packages + Terraform state | Versioned, encrypted, lambda packages expire after 30 days |
 | CloudWatch | Logs and metrics | JSON-structured logs |
@@ -147,6 +149,7 @@ Terraform state is stored in S3 with environment-specific keys (`prod/terraform.
 | `OPENAI_API_KEY` | OpenAI API key | required |
 | `OPENAI_MODEL` | Model for classification + summarisation | `gpt-4o-mini` |
 | `CLUSTER_MODEL` | Optional separate model for story clustering only. Unset = use `OPENAI_MODEL` | unset |
+| `CLASSIFY_MODEL` | Optional separate (e.g. stronger) model for classification and significance scoring only. Unset = use `OPENAI_MODEL` | unset |
 | `ENABLE_SLACK` | `true` / `false` / `log` | `true` |
 | `ENABLE_SUMMARIZATION` | Enable OpenAI summarisation | `true` |
 | `ENABLE_PERSISTENCE` | Enable DynamoDB writes | `true` |

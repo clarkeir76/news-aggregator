@@ -49,6 +49,12 @@ variable "openai_model" {
   default = "gpt-4o-mini"
 }
 
+variable "classify_model" {
+  description = "Optional OpenAI model for classification and significance scoring only (e.g. gpt-4.1). Empty = use openai_model."
+  type        = string
+  default     = ""
+}
+
 variable "cluster_model" {
   description = "Optional OpenAI model for story clustering only (e.g. gpt-4.1). Empty = use openai_model."
   type        = string

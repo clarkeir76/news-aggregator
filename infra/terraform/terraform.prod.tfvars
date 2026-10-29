@@ -9,6 +9,8 @@ eventbridge_schedule = "cron(0 8,12,16 ? * MON-FRI *)"
 eventbridge_timezone = "Europe/London"
 
 enable_slack                  = true
+classify_model                = "gpt-4.1"
+cluster_model                 = "gpt-4.1"
 enable_summarization          = true
 log_level                     = "INFO"
 max_articles_per_feed         = 50

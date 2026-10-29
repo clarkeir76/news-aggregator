@@ -44,6 +44,7 @@ class NewsAggregator:
         min_significance: int = 4,
         openai_model: str = "gpt-4o-mini",
         cluster_model: str = None,
+        classify_model: str = None,
         enable_summarization: bool = True,
         enable_slack: bool = True,
         slack_dry_run: bool = False,
@@ -91,6 +92,7 @@ class NewsAggregator:
                 model=openai_model,
                 min_significance=min_significance,
                 cluster_model=cluster_model,
+                classify_model=classify_model,
             )
             if enable_llm_classification and openai_api_key
             else KeywordClassifier(enabled_topics=enabled_topics)
@@ -187,6 +189,9 @@ class NewsAggregator:
 
             # Step 3: Cluster same-story articles across sources
             articles = self.classifier.cluster_stories(articles)
+
+            # Step 3b: Keep only stories whose best article meets the significance threshold
+            articles = self.classifier.filter_by_significance(articles)
             self.stats["articles_classified"] = len(articles)
 
             # Step 4: Fetch full article text (matched articles only, concurrent)

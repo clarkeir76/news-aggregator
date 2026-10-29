@@ -71,6 +71,8 @@ Creates an OIDC provider and IAM role so GitHub Actions can deploy to AWS withou
 
 The Lambda's `ENABLED_TOPICS` environment variable comes from the Terraform `enabled_topics` variable (default `ai`; comma-separated, empty = all topics). Only the listed topics are classified and sent to Slack.
 
+The `CLASSIFY_MODEL` environment variable comes from the Terraform `classify_model` variable (default empty = classification uses `OPENAI_MODEL`). A stronger model such as `gpt-4.1` gives more consistent significance scores. Production (`terraform.prod.tfvars`) sets `classify_model` and `cluster_model` to `gpt-4.1`; dev and test use the default.
+
 The `CLUSTER_MODEL` environment variable comes from the Terraform `cluster_model` variable (default empty = clustering uses `OPENAI_MODEL`). Set it to a stronger model such as `gpt-4.1` to improve same-story matching.
 
 The `MIN_SIGNIFICANCE` environment variable comes from the Terraform `min_significance` variable (default `4`). Lower it (e.g. to `3`) if the digest is too sparse; raise it to `5` for only the biggest stories.
@@ -184,7 +186,7 @@ aws dynamodb scan --table-name news-aggregator-prod-articles --max-items 5
 
 **~$0.01 per CI run**
 
-### Production (hourly runs)
+### Production (08:00, 12:00 and 16:00 London time, Monday to Friday)
 - Lambda: ~$1/month
 - DynamoDB: ~$1–2/month (PAY_PER_REQUEST)
 - OpenAI: ~$15–30/month (classification + summarisation)

@@ -358,7 +358,25 @@ def test_models_are_passed_to_llm_components(feed_config_file):
         openai_api_key="test-key",
         openai_model="gpt-4o",
         cluster_model="gpt-4.1",
+        classify_model="gpt-4.1-mini",
     )
+    assert agg.classifier.classify_model == "gpt-4.1-mini"
     assert agg.classifier.model == "gpt-4o"
     assert agg.classifier.cluster_model == "gpt-4.1"
     assert agg.summarizer.model == "gpt-4o"
+
+
+def test_run_filters_by_significance_after_clustering(
+    mocker, feed_config_file, article
+):
+    agg = make_aggregator(feed_config_file)
+    mocker.patch.object(agg.ingester, "ingest_feeds", return_value=([article], {}))
+    mocker.patch.object(agg.classifier, "classify_and_filter", return_value=[article])
+    cluster = mocker.patch.object(
+        agg.classifier, "cluster_stories", return_value=[article]
+    )
+    sig = mocker.patch.object(agg.classifier, "filter_by_significance", return_value=[])
+    agg.run()
+
+    cluster.assert_called_once()
+    sig.assert_called_once_with([article])

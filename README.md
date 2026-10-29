@@ -9,7 +9,7 @@ RSS Feeds
    ↓
 [Ingestion] — fetch feeds concurrently, store title + RSS summary only (fast); repeated URLs from overlapping feeds removed
    ↓
-[Classification] — LLM batch call classifies all articles at once, scores each for strategic significance (1–5), discards non-matches and anything below `MIN_SIGNIFICANCE`
+[Classification] — LLM batch call classifies all articles at once, scores each for strategic significance (1–5) and discards non-matches; same-story articles are then clustered and stories whose best article is below `MIN_SIGNIFICANCE` are dropped
    ↓
 [Content Enrichment] — fetch full article text concurrently (only for matched articles)
    ↓
@@ -81,6 +81,7 @@ python app/lambda_handler.py
 | `OPENAI_API_KEY` | OpenAI API key | required |
 | `OPENAI_MODEL` | OpenAI model for classification and summarisation | `gpt-4o-mini` |
 | `CLUSTER_MODEL` | Optional separate (e.g. stronger) model for story clustering only. Unset = use `OPENAI_MODEL` | unset |
+| `CLASSIFY_MODEL` | Optional separate (e.g. stronger) model for classification and significance scoring only. Unset = use `OPENAI_MODEL` | unset |
 | `ENABLE_SLACK` | Slack mode: `true` / `false` / `log` | `true` |
 | `ENABLE_SUMMARIZATION` | Enable OpenAI summarisation | `true` |
 | `ENABLE_PERSISTENCE` | Enable DynamoDB storage | `true` |

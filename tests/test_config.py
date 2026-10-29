@@ -51,3 +51,13 @@ def test_cluster_model_empty_is_none(monkeypatch):
 def test_cluster_model_parses_env(monkeypatch):
     monkeypatch.setenv("CLUSTER_MODEL", "gpt-4.1")
     assert Config().cluster_model == "gpt-4.1"
+
+
+def test_classify_model_unset_is_none(monkeypatch):
+    monkeypatch.delenv("CLASSIFY_MODEL", raising=False)
+    assert Config().classify_model is None
+
+
+def test_classify_model_parses_env(monkeypatch):
+    monkeypatch.setenv("CLASSIFY_MODEL", "gpt-4.1")
+    assert Config().classify_model == "gpt-4.1"

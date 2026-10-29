@@ -1,5 +1,6 @@
 """Topic classification — keyword-based and LLM-based classifiers."""
 
+import html
 import json
 import logging
 import re
@@ -14,13 +15,21 @@ CLASSIFICATION_BATCH_SIZE = 50
 DEFAULT_MIN_SIGNIFICANCE = 4
 CLUSTER_SNIPPET_CHARS = 200
 
+
+def _plain_text(text: str) -> str:
+    """Strip HTML tags/entities and collapse whitespace from an RSS summary."""
+    text = html.unescape(re.sub(r"<[^>]+>", " ", text or ""))
+    return re.sub(r"\s+", " ", text).strip()
+
+
 TOPICS = {
     Topic.AI.value: (
         "Strategically significant news where AI is the central subject: frontier or major model releases "  # noqa: E501
         "and version updates (OpenAI, Anthropic, Google DeepMind, Meta, xAI, DeepSeek etc.), "
         "genuine AI breakthroughs or groundbreaking real-world uses of AI, major AI company moves "  # noqa: E501
         "(large funding rounds, acquisitions, significant partnerships, leadership changes at AI labs), "  # noqa: E501
-        "AI compute and chip economics, AI regulation and policy that changes what organisations can do, "  # noqa: E501
+        "AI compute and chip economics, market-moving AI business news (big-tech earnings or "
+        "share-price moves driven by AI, shifts in AI capex, major AI revenue deals), AI regulation and policy that changes what organisations can do, "  # noqa: E501
         "significant AI safety incidents, and AI reshaping work or industries at scale. "
         "Also include AI in education ONLY when strategic or groundbreaking: major institutional or "  # noqa: E501
         "government AI policy, large-scale deployments, or significant changes to how people learn "  # noqa: E501
@@ -74,10 +83,12 @@ class LLMClassifier:
         enabled_topics: Optional[List[str]] = None,
         min_significance: int = DEFAULT_MIN_SIGNIFICANCE,
         cluster_model: Optional[str] = None,
+        classify_model: Optional[str] = None,
     ):
         self.client = openai.OpenAI(api_key=api_key)
         self.model = model
         self.cluster_model = cluster_model or model
+        self.classify_model = classify_model or model
         self.min_significance = min_significance
         self.topics = {
             topic: description
@@ -105,7 +116,7 @@ class LLMClassifier:
         indexed = {str(i + 1): article for i, article in enumerate(articles)}
         lines = []
         for num, article in indexed.items():
-            snippet = (article.content or "").strip()[:CLUSTER_SNIPPET_CHARS]
+            snippet = _plain_text(article.content)[:CLUSTER_SNIPPET_CHARS]
             lines.append(f"{num}. {article.title}")
             if snippet:
                 lines.append(f"   Summary: {snippet}")
@@ -124,7 +135,14 @@ Rules:
   companies are strong signals
 - Do NOT group articles that merely share a topic or theme (e.g. two different AI lawsuits
   are NOT the same story just because both involve AI and legal action)
-- When in doubt about whether articles share the same specific event, group them together
+- Sharing a company, person or theme is NOT enough to group articles. Two articles that both
+  mention Anthropic, Google or OpenAI are different stories unless they report the same
+  specific event (e.g. an Anthropic research result and an Anthropic engineer's comments on
+  hiring are different stories; two different companies' AI models for cybersecurity are
+  different stories)
+- To be grouped, articles must report the same specific launch, incident, announcement, result
+  or report. If you are unsure, keep them separate; but when the event clearly matches, group
+  them even if the framing, outlet or article type (news, analysis, review) differs
 - Every article number must appear in exactly one group
 
 Return JSON only: {{"groups": [[1, 4], [2], [3], [5, 6]]}}
@@ -155,6 +173,11 @@ Titles:
                 continue
             primary = max(members, key=lambda a: len(a.content or ""))
             related = [a for a in members if a is not primary]
+            if len(members) > 1:
+                logger.info(
+                    "Cluster: "
+                    + " | ".join(f"{a.title} [{a.significance}]" for a in members)
+                )
             primary.related_urls = list(
                 dict.fromkeys(a.url for a in related if a.url != primary.url)
             )
@@ -173,7 +196,9 @@ Titles:
     def classify_and_filter(self, articles: List[Article]) -> List[Article]:
         """
         Classify a batch of articles in one LLM call.
-        Returns only articles that match at least one topic, with topics set.
+        Returns articles that match at least one topic, with topics and significance
+        set. The significance threshold is applied later by filter_by_significance,
+        after clustering, so a story is judged by its best-scoring article.
         """
         if not articles:
             return []
@@ -196,6 +221,29 @@ Titles:
             f"LLM classification: {len(matched)} matched, {discarded} discarded from {len(articles)} articles"  # noqa: E501
         )
         return matched
+
+    def filter_by_significance(self, articles: List[Article]) -> List[Article]:
+        """
+        Drop articles (clustered stories) scoring below min_significance. Unscored
+        articles are kept. Call after cluster_stories so a cluster's score is the
+        highest among its member articles.
+        """
+        kept = []
+        for article in articles:
+            score = article.significance
+            if score is not None and score < self.min_significance:
+                logger.info(
+                    f"Dropped (significance {score} < {self.min_significance}): "
+                    f"{article.title}"
+                )
+                continue
+            logger.info(f"Kept (significance {score}): {article.title}")
+            kept.append(article)
+        logger.info(
+            f"Significance filter: {len(kept)} kept, {len(articles) - len(kept)} dropped "
+            f"(threshold {self.min_significance})"
+        )
+        return kept
 
     def _classify_batch(self, articles: List[Article]) -> dict:
         """
@@ -232,9 +280,7 @@ Titles:
 
         article_lines = []
         for num, article in indexed.items():
-            summary = (
-                article.content[:300] if article.content else ""
-            ).strip() or "No summary"
+            summary = _plain_text(article.content)[:300] or "No summary"
             article_lines.append(
                 f"{num}. Title: {article.title}\n   Summary: {summary}"
             )
@@ -254,6 +300,12 @@ Rules:
 - Give each article a significance score from 1 to 5: 5 = major story everyone in the industry will
   discuss, 4 = clearly strategic or groundbreaking, 3 = relevant but routine, 2 = minor or niche,
   1 = not relevant. Use an empty topics list if nothing matches
+- Scores must be calibrated harshly: most matching articles should score 2 or 3, and only about
+  1 in 20 should score 4 or 5. Score at most 2 for: webinars, event or product promotion,
+  vendor tool or product announcements, opinion pieces and explainers, case studies, and
+  partnerships involving non-AI companies. Score 4 for market-moving AI business news, such as
+  big-tech earnings or share-price moves driven by AI, shifts in AI capex, or major AI revenue
+  deals. Reserve 5 for stories like a frontier model release or a major regulatory event
 - Respond with valid JSON only, mapping article number to its topics and significance
 
 Example: {example}
@@ -262,7 +314,7 @@ Articles:
 {chr(10).join(article_lines)}"""
 
         response = self.client.chat.completions.create(
-            model=self.model,
+            model=self.classify_model,
             messages=[
                 {
                     "role": "system",
@@ -288,8 +340,6 @@ Articles:
             topics, significance = self._parse_entry(entry)
             topics = [t for t in topics if t in self.topics]
             if not topics:
-                continue
-            if significance is not None and significance < self.min_significance:
                 continue
             matches[indexed[num].url] = (topics, significance)
         return matches
@@ -412,4 +462,8 @@ class KeywordClassifier:
 
     def cluster_stories(self, articles: List[Article]) -> List[Article]:
         """Keyword classifier has no clustering — return articles unchanged."""
+        return articles
+
+    def filter_by_significance(self, articles: List[Article]) -> List[Article]:
+        """Keyword classifier has no significance score — return articles unchanged."""
         return articles

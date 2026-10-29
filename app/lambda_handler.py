@@ -52,6 +52,7 @@ def lambda_handler(event, context):
             min_significance=config.min_significance,
             openai_model=config.openai_model,
             cluster_model=config.cluster_model,
+            classify_model=config.classify_model,
             enable_summarization=config.enable_summarization,
             enable_slack=config.enable_slack,
             slack_dry_run=config.slack_dry_run,

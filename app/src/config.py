@@ -24,6 +24,8 @@ class Config:
         self.openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
         # Optional stronger model for story clustering only; unset = use openai_model
         self.cluster_model = os.getenv("CLUSTER_MODEL") or None
+        # Optional stronger model for classification + significance scoring only
+        self.classify_model = os.getenv("CLASSIFY_MODEL") or None
 
         # Logging
         self.log_level = os.getenv("LOG_LEVEL", "INFO")
