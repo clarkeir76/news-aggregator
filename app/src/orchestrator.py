@@ -41,6 +41,9 @@ class NewsAggregator:
         openai_api_key: str = None,
         slack_webhooks: dict = None,
         enabled_topics: list = None,
+        min_significance: int = 4,
+        openai_model: str = "gpt-4o-mini",
+        cluster_model: str = None,
         enable_summarization: bool = True,
         enable_slack: bool = True,
         slack_dry_run: bool = False,
@@ -82,7 +85,13 @@ class NewsAggregator:
         )
 
         self.classifier = (
-            LLMClassifier(api_key=openai_api_key, enabled_topics=enabled_topics)
+            LLMClassifier(
+                api_key=openai_api_key,
+                enabled_topics=enabled_topics,
+                model=openai_model,
+                min_significance=min_significance,
+                cluster_model=cluster_model,
+            )
             if enable_llm_classification and openai_api_key
             else KeywordClassifier(enabled_topics=enabled_topics)
         )
@@ -103,7 +112,7 @@ class NewsAggregator:
 
         self.summarizer = None
         if enable_summarization and openai_api_key:
-            self.summarizer = Summarizer(api_key=openai_api_key)
+            self.summarizer = Summarizer(api_key=openai_api_key, model=openai_model)
 
         self.notifier = None
         if enable_slack and slack_webhooks:
@@ -122,6 +131,22 @@ class NewsAggregator:
             "articles_notified": 0,
             "errors": [],
         }
+
+    @staticmethod
+    def _dedupe_urls(articles: list) -> list:
+        """Drop later copies of an article whose URL has already been seen."""
+        seen = set()
+        unique = []
+        for article in articles:
+            key = article.url.strip().rstrip("/")
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(article)
+        removed = len(articles) - len(unique)
+        if removed:
+            logger.info(f"Removed {removed} repeated URL(s) from overlapping feeds")
+        return unique
 
     def run(self) -> dict:
         logger.info("Starting news aggregation pipeline")
@@ -151,6 +176,9 @@ class NewsAggregator:
             logger.info(
                 f"Ingested {len(articles)} articles from {len(feed_configs)} feeds"
             )
+
+            # Remove exact-URL repeats (same article via overlapping feeds) before any LLM work
+            articles = self._dedupe_urls(articles)
 
             # Step 2: Classify and filter
             articles = self.classifier.classify_and_filter(articles)

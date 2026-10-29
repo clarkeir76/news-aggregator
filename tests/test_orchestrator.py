@@ -312,3 +312,53 @@ def test_summarise_handles_failure_gracefully(mocker, feed_config_file, article)
 
     assert summaries == {}
     assert agg.stats["articles_summarized"] == 0
+
+
+def test_dedupe_urls_removes_repeats_from_overlapping_feeds(article):
+    copy = Article(
+        title="Test Article",
+        source="example.com",
+        url="https://example.com/article/",
+        published_at=article.published_at,
+        content="A" * 300,
+    )
+    other = Article(
+        title="Other",
+        source="example.com",
+        url="https://example.com/other",
+        published_at=article.published_at,
+        content="B" * 300,
+    )
+    result = NewsAggregator._dedupe_urls([article, copy, other])
+
+    assert [a.url for a in result] == [
+        "https://example.com/article",
+        "https://example.com/other",
+    ]
+
+
+def test_run_dedupes_urls_before_classification(mocker, feed_config_file, article):
+    agg = make_aggregator(feed_config_file)
+    mocker.patch.object(
+        agg.ingester, "ingest_feeds", return_value=([article, article], {})
+    )
+    classify = mocker.patch.object(
+        agg.classifier, "classify_and_filter", return_value=[]
+    )
+    agg.run()
+
+    assert len(classify.call_args.args[0]) == 1
+
+
+def test_models_are_passed_to_llm_components(feed_config_file):
+    agg = make_aggregator(
+        feed_config_file,
+        enable_llm_classification=True,
+        enable_summarization=True,
+        openai_api_key="test-key",
+        openai_model="gpt-4o",
+        cluster_model="gpt-4.1",
+    )
+    assert agg.classifier.model == "gpt-4o"
+    assert agg.classifier.cluster_model == "gpt-4.1"
+    assert agg.summarizer.model == "gpt-4o"

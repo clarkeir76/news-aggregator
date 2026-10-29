@@ -7,9 +7,9 @@ A Python news aggregation and summarisation system that pulls articles from mult
 ```
 RSS Feeds
    ↓
-[Ingestion] — fetch feeds concurrently, store title + RSS summary only (fast)
+[Ingestion] — fetch feeds concurrently, store title + RSS summary only (fast); repeated URLs from overlapping feeds removed
    ↓
-[Classification] — LLM batch call classifies all articles at once, discards non-matches
+[Classification] — LLM batch call classifies all articles at once, scores each for strategic significance (1–5), discards non-matches and anything below `MIN_SIGNIFICANCE`
    ↓
 [Content Enrichment] — fetch full article text concurrently (only for matched articles)
    ↓
@@ -19,7 +19,7 @@ RSS Feeds
    ↓
 [Summarisation] — OpenAI gpt-4o-mini
    ↓
-[Slack] — one digest message per topic channel per run
+[Slack] — one digest message per topic channel per run, most significant stories first (max 10)
 ```
 
 The pipeline is ordered to minimise expensive operations: RSS fetching is fast, so all
@@ -79,12 +79,14 @@ python app/lambda_handler.py
 | `AWS_ENDPOINT_URL` | Override AWS endpoint — set to `http://localhost:8000` for DynamoDB Local | unset (real AWS) |
 | `DYNAMODB_TABLE` | DynamoDB table name | `news-articles` |
 | `OPENAI_API_KEY` | OpenAI API key | required |
-| `OPENAI_MODEL` | OpenAI model | `gpt-4o-mini` |
+| `OPENAI_MODEL` | OpenAI model for classification and summarisation | `gpt-4o-mini` |
+| `CLUSTER_MODEL` | Optional separate (e.g. stronger) model for story clustering only. Unset = use `OPENAI_MODEL` | unset |
 | `ENABLE_SLACK` | Slack mode: `true` / `false` / `log` | `true` |
 | `ENABLE_SUMMARIZATION` | Enable OpenAI summarisation | `true` |
 | `ENABLE_PERSISTENCE` | Enable DynamoDB storage | `true` |
 | `ENABLE_LLM_CLASSIFICATION` | Use LLM to classify and filter articles (falls back to keywords if disabled or no API key) | `true` |
 | `ENABLED_TOPICS` | Comma-separated topics to classify and send (`tech`, `ai`, `cyber_security`, `education`). Unset = all topics. Disabled topics are never offered to the classifier, so their articles are dropped before content fetching | all |
+| `MIN_SIGNIFICANCE` | Minimum 1–5 significance score the LLM classifier must give an article for it to be kept (5 = major story, 4 = clearly strategic, 3 = routine). Higher = more selective | `4` |
 | `FEED_CONFIG_PATH` | Path to feeds.yaml | resolved relative to lambda_handler.py |
 | `LOG_LEVEL` | Logging level | `INFO` |
 | `MAX_ARTICLES_PER_FEED` | Articles fetched per RSS feed per run | `50` |

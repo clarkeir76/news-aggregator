@@ -45,7 +45,7 @@ class SlackNotifier:
 
         return success
 
-    MAX_ARTICLES = 20
+    MAX_ARTICLES = 10
     MAX_PAYLOAD_CHARS = 7800
 
     @classmethod
@@ -54,7 +54,10 @@ class SlackNotifier:
     ) -> dict:
         """Build a plain text payload for a Slack Workflow Builder webhook."""
         total = len(articles)
-        capped = articles[: cls.MAX_ARTICLES]
+        # Most significant first (stable, so unscored articles keep feed order), so that
+        # the article cap and payload truncation drop the least significant stories
+        ranked = sorted(articles, key=lambda a: a.significance or 0, reverse=True)
+        capped = ranked[: cls.MAX_ARTICLES]
         omitted = total - len(capped)
 
         noun = "article" if total == 1 else "articles"
@@ -65,13 +68,15 @@ class SlackNotifier:
 
         for article in capped:
             lines.append(f"\n{article.title}")
-            all_urls = ([article.url] + (article.related_urls or []))[:3]
+            all_urls = list(
+                dict.fromkeys([article.url] + (article.related_urls or []))
+            )[:3]
             for url in all_urls:
                 lines.append(url)
             summary = summaries.get(article.url)
             if summary:
                 lines.append(summary)
-            source = "multiple sources" if article.related_urls else article.source
+            source = "multiple sources" if len(all_urls) > 1 else article.source
             lines.append(
                 f"source: {source} | {article.published_at.strftime('%Y-%m-%d %H:%M UTC')}"
             )

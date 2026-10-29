@@ -343,3 +343,185 @@ def test_llm_classifier_discards_articles_matching_only_disabled_topics(mock_ope
 
     assert [a.url for a in result] == ["https://example.com/2"]
     assert result[0].topics == ["ai"]
+
+
+# --- Significance scoring ---
+
+
+def _classify_with_response(mock_openai, payload, **kwargs):
+    import json
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps(payload)
+    classifier = LLMClassifier(api_key="test-key", enabled_topics=["ai"], **kwargs)
+    classifier.client = mock_openai
+    articles = [
+        make_article("Major model release", url="https://example.com/1"),
+        make_article("Minor feature tweak", url="https://example.com/2"),
+    ]
+    return classifier.classify_and_filter(articles)
+
+
+def test_llm_classifier_drops_articles_below_min_significance(mock_openai):
+    result = _classify_with_response(
+        mock_openai,
+        {
+            "1": {"topics": ["ai"], "significance": 5},
+            "2": {"topics": ["ai"], "significance": 3},
+        },
+    )
+    assert [a.url for a in result] == ["https://example.com/1"]
+    assert result[0].topics == ["ai"]
+
+
+def test_llm_classifier_min_significance_is_configurable(mock_openai):
+    result = _classify_with_response(
+        mock_openai,
+        {
+            "1": {"topics": ["ai"], "significance": 5},
+            "2": {"topics": ["ai"], "significance": 3},
+        },
+        min_significance=3,
+    )
+    assert len(result) == 2
+
+
+def test_llm_classifier_default_threshold_keeps_score_of_four(mock_openai):
+    result = _classify_with_response(
+        mock_openai,
+        {
+            "1": {"topics": ["ai"], "significance": 4},
+            "2": {"topics": [], "significance": 5},
+        },
+    )
+    assert [a.url for a in result] == ["https://example.com/1"]
+
+
+def test_llm_classifier_accepts_bare_topic_list_without_score(mock_openai):
+    result = _classify_with_response(mock_openai, {"1": ["ai"], "2": []})
+    assert [a.url for a in result] == ["https://example.com/1"]
+
+
+def test_ai_topic_requires_ai_to_be_the_subject():
+    from app.src.classification import TOPICS
+
+    description = TOPICS["ai"]
+    assert "primarily ABOUT AI" in description
+    assert "student using AI for homework" in description
+
+
+def test_llm_classifier_prompt_requests_significance_score(mock_openai):
+    import json
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps({"1": {"topics": ["ai"], "significance": 5}})
+    classifier = LLMClassifier(api_key="test-key", enabled_topics=["ai"])
+    classifier.client = mock_openai
+
+    classifier.classify_and_filter([make_article("New LLM")])
+
+    prompt = mock_openai.chat.completions.create.call_args.kwargs["messages"][1][
+        "content"
+    ]
+    assert "significance" in prompt
+
+
+# --- Clustering improvements ---
+
+
+def test_cluster_prompt_includes_summary_snippets_and_analysis_rule(mock_openai):
+    import json
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps({"groups": [[1], [2]]})
+    articles = [
+        make_article("Model launch", "Gemini 4 Carbon unveiled", "https://a.com/1"),
+        make_article("Looks like a diamond", "Hands-on review", "https://b.com/1"),
+    ]
+    LLMClassifier(api_key="test-key").cluster_stories(articles)
+
+    prompt = mock_openai.chat.completions.create.call_args.kwargs["messages"][1][
+        "content"
+    ]
+    assert "Summary: Gemini 4 Carbon unveiled" in prompt
+    assert "review" in prompt.lower() and "same group" in prompt.lower()
+
+
+def test_cluster_uses_cluster_model_when_set(mock_openai):
+    import json
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps({"groups": [[1], [2]]})
+    articles = [
+        make_article("A", url="https://a.com/1"),
+        make_article("B", url="https://b.com/1"),
+    ]
+    LLMClassifier(
+        api_key="test-key", model="gpt-4o-mini", cluster_model="gpt-4.1"
+    ).cluster_stories(articles)
+
+    assert mock_openai.chat.completions.create.call_args.kwargs["model"] == "gpt-4.1"
+
+
+def test_cluster_model_defaults_to_main_model(mock_openai):
+    import json
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps({"groups": [[1], [2]]})
+    articles = [
+        make_article("A", url="https://a.com/1"),
+        make_article("B", url="https://b.com/1"),
+    ]
+    LLMClassifier(api_key="test-key", model="gpt-4o").cluster_stories(articles)
+
+    assert mock_openai.chat.completions.create.call_args.kwargs["model"] == "gpt-4o"
+
+
+def test_cluster_excludes_primary_url_from_related_urls(mock_openai):
+    import json
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps({"groups": [[1, 2, 3]]})
+    articles = [
+        make_article("Same story", "long content here", "https://a.com/1"),
+        make_article("Same story", "x", "https://a.com/1"),
+        make_article("Same story again", "y", "https://b.com/1"),
+    ]
+    result = LLMClassifier(api_key="test-key").cluster_stories(articles)
+
+    assert len(result) == 1
+    assert result[0].related_urls == ["https://b.com/1"]
+
+
+def test_cluster_keeps_highest_significance(mock_openai):
+    import json
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps({"groups": [[1, 2]]})
+    articles = [
+        make_article("Story", "longer content", "https://a.com/1"),
+        make_article("Story", "x", "https://b.com/1"),
+    ]
+    articles[0].significance = 4
+    articles[1].significance = 5
+    result = LLMClassifier(api_key="test-key").cluster_stories(articles)
+
+    assert result[0].significance == 5
+
+
+def test_llm_classifier_sets_significance_on_articles(mock_openai):
+    result = _classify_with_response(
+        mock_openai,
+        {
+            "1": {"topics": ["ai"], "significance": 5},
+            "2": {"topics": ["ai"], "significance": 4},
+        },
+    )
+    assert [a.significance for a in result] == [5, 4]

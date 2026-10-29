@@ -52,11 +52,13 @@ module "lambda" {
     DYNAMODB_TABLE                = module.dynamodb.table_name
     OPENAI_API_KEY                = var.openai_api_key
     OPENAI_MODEL                  = var.openai_model
+    CLUSTER_MODEL                 = var.cluster_model
     ENABLE_SLACK                  = tostring(var.enable_slack)
     ENABLE_SUMMARIZATION          = tostring(var.enable_summarization)
     ENABLE_PERSISTENCE            = "true"
     ENABLE_LLM_CLASSIFICATION     = "true"
     ENABLED_TOPICS                = var.enabled_topics
+    MIN_SIGNIFICANCE              = tostring(var.min_significance)
     LOG_LEVEL                     = var.log_level
     MAX_ARTICLES_PER_FEED         = tostring(var.max_articles_per_feed)
     MAX_SUMMARY_LENGTH            = tostring(var.max_summary_length)

@@ -49,10 +49,22 @@ variable "openai_model" {
   default = "gpt-4o-mini"
 }
 
+variable "cluster_model" {
+  description = "Optional OpenAI model for story clustering only (e.g. gpt-4.1). Empty = use openai_model."
+  type        = string
+  default     = ""
+}
+
 variable "enabled_topics" {
   description = "Comma-separated topics to classify and send (tech, ai, cyber_security, education). Empty = all topics."
   type        = string
   default     = "ai"
+}
+
+variable "min_significance" {
+  description = "Minimum 1-5 significance score the classifier must give an article for it to be sent. Higher = more selective."
+  type        = number
+  default     = 4
 }
 
 variable "enable_slack" {

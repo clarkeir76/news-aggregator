@@ -71,6 +71,10 @@ Creates an OIDC provider and IAM role so GitHub Actions can deploy to AWS withou
 
 The Lambda's `ENABLED_TOPICS` environment variable comes from the Terraform `enabled_topics` variable (default `ai`; comma-separated, empty = all topics). Only the listed topics are classified and sent to Slack.
 
+The `CLUSTER_MODEL` environment variable comes from the Terraform `cluster_model` variable (default empty = clustering uses `OPENAI_MODEL`). Set it to a stronger model such as `gpt-4.1` to improve same-story matching.
+
+The `MIN_SIGNIFICANCE` environment variable comes from the Terraform `min_significance` variable (default `4`). Lower it (e.g. to `3`) if the digest is too sparse; raise it to `5` for only the biggest stories.
+
 ---
 
 ## Step 4: Deploy

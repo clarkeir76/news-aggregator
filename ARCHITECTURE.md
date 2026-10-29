@@ -40,9 +40,13 @@ This means hourly runs only process the last hour's articles. If the pipeline ha
 
 ### Step 2: LLM Classification, Filter and Story Clustering
 
-All article titles and summaries are sent to OpenAI in a **single batch API call**. The LLM returns topic assignments (`tech`, `ai`, `cyber_security`, `education`) and discards articles that don't match any topic (general news, sport, weather etc.).
+All article titles and summaries are sent to OpenAI in a **single batch API call**. The LLM returns topic assignments (`tech`, `ai`, `cyber_security`, `education`) and a 1–5 significance score per article. Articles that don't match any topic (general news, sport, weather etc.), or score below `MIN_SIGNIFICANCE` (default 4), are discarded. The `ai` topic requires AI to be the article's main subject, not an incidental mention.
 
-A second LLM call then **clusters same-story articles** — multiple outlets covering the same event are merged into one entry. The richest article (most content) becomes the primary; other URLs are stored as `related_urls`. Slack shows all source URLs under a single summary, labelled "multiple sources".
+Before classification, articles with a repeated URL (the same article arriving via overlapping feeds, e.g. a site's main and AI category feeds) are removed so they are not classified or clustered twice.
+
+A second LLM call then **clusters same-story articles** — multiple outlets covering the same event are merged into one entry. The prompt sees each title plus the first 200 characters of its RSS summary, and treats analysis/review pieces about an announcement as the same story as the announcement. It uses `CLUSTER_MODEL` if set. The richest article (most content) becomes the primary and inherits the highest significance score in the cluster; other URLs are stored as `related_urls`. Slack shows all source URLs under a single summary, labelled "multiple sources" only when there is more than one distinct URL.
+
+The Slack digest is ordered by significance score (highest first) and capped at 10 articles, so any cap or payload truncation drops the least significant stories.
 
 If the LLM call fails, `KeywordClassifier` is used as a fallback. Both classifiers implement the same `classify_and_filter` interface.
 
@@ -142,11 +146,13 @@ Terraform state is stored in S3 with environment-specific keys (`prod/terraform.
 | `DYNAMODB_TABLE` | DynamoDB table name | `news-articles` |
 | `OPENAI_API_KEY` | OpenAI API key | required |
 | `OPENAI_MODEL` | Model for classification + summarisation | `gpt-4o-mini` |
+| `CLUSTER_MODEL` | Optional separate model for story clustering only. Unset = use `OPENAI_MODEL` | unset |
 | `ENABLE_SLACK` | `true` / `false` / `log` | `true` |
 | `ENABLE_SUMMARIZATION` | Enable OpenAI summarisation | `true` |
 | `ENABLE_PERSISTENCE` | Enable DynamoDB writes | `true` |
 | `ENABLE_LLM_CLASSIFICATION` | Use LLM to classify (falls back to keywords) | `true` |
 | `ENABLED_TOPICS` | Comma-separated topics to classify and send (`tech`, `ai`, `cyber_security`, `education`). Unset = all topics. Disabled topics are never offered to the classifier, so their articles are dropped before content fetching | all |
+| `MIN_SIGNIFICANCE` | Minimum 1–5 significance score the LLM classifier must give an article for it to be kept (5 = major story, 4 = clearly strategic, 3 = routine). Higher = more selective | `4` |
 | `ENABLE_EMBEDDINGS` | Embed articles into Qdrant for RAG queries | `false` |
 | `QDRANT_URL` | Qdrant endpoint | `http://localhost:6333` |
 | `QDRANT_API_KEY` | Qdrant Cloud API key (leave blank for local) | unset |

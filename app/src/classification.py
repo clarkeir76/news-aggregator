@@ -11,13 +11,27 @@ from .models import Article, Topic
 logger = logging.getLogger(__name__)
 
 CLASSIFICATION_BATCH_SIZE = 50
+DEFAULT_MIN_SIGNIFICANCE = 4
+CLUSTER_SNIPPET_CHARS = 200
 
 TOPICS = {
     Topic.AI.value: (
-        "Artificial intelligence and machine learning: LLMs, generative AI, AI research breakthroughs, "  # noqa: E501
-        "new AI products and tools, AI company news (OpenAI, Anthropic, Google DeepMind etc.), "
-        "AI regulation and policy, AI's impact on work and industries. "
-        "Cast a wide net — include most AI stories."
+        "Strategically significant news where AI is the central subject: frontier or major model releases "  # noqa: E501
+        "and version updates (OpenAI, Anthropic, Google DeepMind, Meta, xAI, DeepSeek etc.), "
+        "genuine AI breakthroughs or groundbreaking real-world uses of AI, major AI company moves "  # noqa: E501
+        "(large funding rounds, acquisitions, significant partnerships, leadership changes at AI labs), "  # noqa: E501
+        "AI compute and chip economics, AI regulation and policy that changes what organisations can do, "  # noqa: E501
+        "significant AI safety incidents, and AI reshaping work or industries at scale. "
+        "Also include AI in education ONLY when strategic or groundbreaking: major institutional or "  # noqa: E501
+        "government AI policy, large-scale deployments, or significant changes to how people learn "  # noqa: E501
+        "or are assessed. "
+        "The article must be primarily ABOUT AI itself. EXCLUDE stories where AI or an AI company/executive "  # noqa: E501
+        "is only incidental (e.g. espionage, lawsuits or scandals involving a person who works in AI, "  # noqa: E501
+        "general business or politics that merely mentions AI). "
+        "EXCLUDE: incremental feature updates, minor product launches, individual research papers "  # noqa: E501
+        "(unless widely covered), tutorials, opinion pieces, listicles, 'AI-powered' marketing, "  # noqa: E501
+        "minor startup news, and anecdotal stories (e.g. a student using AI for homework). "
+        "Ask: would a senior technology leader's colleagues and peers be discussing this?"
     ),
     Topic.TECH.value: (
         "Technology news relevant to a software engineering leader: new developer tools and frameworks, "  # noqa: E501
@@ -58,9 +72,13 @@ class LLMClassifier:
         api_key: str,
         model: str = "gpt-4o-mini",
         enabled_topics: Optional[List[str]] = None,
+        min_significance: int = DEFAULT_MIN_SIGNIFICANCE,
+        cluster_model: Optional[str] = None,
     ):
         self.client = openai.OpenAI(api_key=api_key)
         self.model = model
+        self.cluster_model = cluster_model or model
+        self.min_significance = min_significance
         self.topics = {
             topic: description
             for topic, description in TOPICS.items()
@@ -85,7 +103,12 @@ class LLMClassifier:
 
     def _cluster(self, articles: List[Article]) -> List[Article]:
         indexed = {str(i + 1): article for i, article in enumerate(articles)}
-        lines = [f"{num}. {article.title}" for num, article in indexed.items()]
+        lines = []
+        for num, article in indexed.items():
+            snippet = (article.content or "").strip()[:CLUSTER_SNIPPET_CHARS]
+            lines.append(f"{num}. {article.title}")
+            if snippet:
+                lines.append(f"   Summary: {snippet}")
 
         prompt = f"""Group these news article titles where multiple outlets are reporting on the
 EXACT SAME specific news event, incident, or announcement.
@@ -94,6 +117,11 @@ Rules:
 - Group articles if they are clearly about the same specific event (e.g. the same lawsuit,
   the same breach, the same product launch, the same report) — different headline angles or
   framings of the same event belong in the same group
+- Analysis, review, opinion or explainer pieces about the same launch, announcement or event
+  belong in the same group as the news reports of it (e.g. a review of a model release is the
+  same story as the announcement of that release)
+- Use the summaries as well as the titles to decide: shared names, products, numbers and
+  companies are strong signals
 - Do NOT group articles that merely share a topic or theme (e.g. two different AI lawsuits
   are NOT the same story just because both involve AI and legal action)
 - When in doubt about whether articles share the same specific event, group them together
@@ -105,7 +133,7 @@ Titles:
 {chr(10).join(lines)}"""
 
         response = self.client.chat.completions.create(
-            model=self.model,
+            model=self.cluster_model,
             messages=[
                 {
                     "role": "system",
@@ -127,7 +155,11 @@ Titles:
                 continue
             primary = max(members, key=lambda a: len(a.content or ""))
             related = [a for a in members if a is not primary]
-            primary.related_urls = [a.url for a in related]
+            primary.related_urls = list(
+                dict.fromkeys(a.url for a in related if a.url != primary.url)
+            )
+            scores = [a.significance for a in members if a.significance is not None]
+            primary.significance = max(scores) if scores else None
             merged.append(primary)
 
         clustered = len(articles) - len(merged)
@@ -147,16 +179,16 @@ Titles:
             return []
 
         try:
-            url_to_topics = self._classify_batch(articles)
+            url_to_result = self._classify_batch(articles)
         except Exception as e:
             logger.error(f"LLM classification failed, falling back to keywords: {e}")
             return self._fallback.classify_and_filter(articles)
 
         matched = []
         for article in articles:
-            topics = url_to_topics.get(article.url, [])
-            if topics:
-                article.topics = topics
+            result = url_to_result.get(article.url)
+            if result:
+                article.topics, article.significance = result
                 matched.append(article)
 
         discarded = len(articles) - len(matched)
@@ -168,7 +200,7 @@ Titles:
     def _classify_batch(self, articles: List[Article]) -> dict:
         """
         Classify articles in chunks, merge results.
-        Returns dict mapping article URL -> list of matched topics.
+        Returns dict mapping article URL -> (matched topics, significance or None).
         """
         all_results = {}
         chunks = [
@@ -183,7 +215,7 @@ Titles:
         return all_results
 
     def _classify_chunk(self, articles: List[Article]) -> dict:
-        """Send one chunk of articles to the LLM. Returns url -> topics dict."""
+        """Send one chunk of articles to the LLM. Returns url -> (topics, significance)."""
         indexed = {str(i + 1): article for i, article in enumerate(articles)}
 
         topic_descriptions = "\n".join(
@@ -192,9 +224,9 @@ Titles:
         topic_names = list(self.topics)
         example = json.dumps(
             {
-                "1": topic_names[:1],
-                "2": topic_names[:2],
-                "3": [],
+                "1": {"topics": topic_names[:1], "significance": 5},
+                "2": {"topics": topic_names[:2], "significance": 4},
+                "3": {"topics": [], "significance": 1},
             }
         )
 
@@ -207,18 +239,22 @@ Titles:
                 f"{num}. Title: {article.title}\n   Summary: {summary}"
             )
 
-        prompt = f"""Classify these news articles for a UK software engineering leader who works in the  # noqa: E501
-commercial post-18 education sector (apprenticeships, university degrees, professional development).
-Select articles that are professionally relevant or genuinely newsworthy at a strategic level.
+        prompt = f"""Classify these news articles for a senior technology leader in the
+education sector. They want to stay up to date on the news their colleagues and peers
+will be discussing, not niche or incremental developments. Be highly selective.
 
 Topics and criteria:
 {topic_descriptions}
 
 Rules:
-- Only assign a topic if the article clearly fits the criteria above, including any EXCLUDE rules
+- Only assign a topic if the article is primarily ABOUT that topic and clearly fits the
+  criteria above, including any EXCLUDE rules. A passing mention of a topic does not count
 - An article can match multiple topics
 - Exclude general news (politics, sport, entertainment, consumer lifestyle, weather)
-- Respond with valid JSON only, mapping article number to its matched topics (empty list = no match)
+- Give each article a significance score from 1 to 5: 5 = major story everyone in the industry will
+  discuss, 4 = clearly strategic or groundbreaking, 3 = relevant but routine, 2 = minor or niche,
+  1 = not relevant. Use an empty topics list if nothing matches
+- Respond with valid JSON only, mapping article number to its topics and significance
 
 Example: {example}
 
@@ -231,8 +267,9 @@ Articles:
                 {
                     "role": "system",
                     "content": (
-                        "You are a news classification assistant for a senior technology and education professional. "  # noqa: E501
-                        "Be selective — only include articles that are genuinely relevant to the stated criteria. "  # noqa: E501
+                        "You are a news classification assistant for a senior technology leader. "
+                        "Be highly selective — only include articles whose main subject matches the stated criteria "  # noqa: E501
+                        "and that are strategically significant. "
                         "Respond with valid JSON only."
                     ),
                 },
@@ -244,13 +281,30 @@ Articles:
 
         result = json.loads(response.choices[0].message.content)
 
-        return {
-            indexed[num].url: [t for t in topics if t in self.topics]
-            for num, topics in result.items()
-            if num in indexed
-            and isinstance(topics, list)
-            and any(t in self.topics for t in topics)
-        }
+        matches = {}
+        for num, entry in result.items():
+            if num not in indexed:
+                continue
+            topics, significance = self._parse_entry(entry)
+            topics = [t for t in topics if t in self.topics]
+            if not topics:
+                continue
+            if significance is not None and significance < self.min_significance:
+                continue
+            matches[indexed[num].url] = (topics, significance)
+        return matches
+
+    @staticmethod
+    def _parse_entry(entry):
+        """Return (topics, significance) from a classifier entry; a bare list has no score."""
+        if isinstance(entry, list):
+            return entry, None
+        if isinstance(entry, dict) and isinstance(entry.get("topics"), list):
+            significance = entry.get("significance")
+            if not isinstance(significance, (int, float)):
+                significance = None
+            return entry["topics"], significance
+        return [], None
 
 
 class KeywordClassifier:

@@ -22,9 +22,25 @@ Key decisions and the reasoning behind them.
 
 ## LLM classification with reader-specific criteria
 
-**Decision**: The classification prompt includes explicit include/exclude criteria per topic, calibrated for a UK software engineering leader in the post-18 education sector. Topic descriptions define not just what to include but what to actively exclude (e.g. consumer tech deals for `tech`, primary school stories for `education`). The system prompt identifies the reader role so the LLM can make relevance judgements at the right level.
+**Decision**: The classification prompt includes explicit include/exclude criteria per topic, originally calibrated for a UK software engineering leader in the post-18 education sector (see "Strategic significance scoring" below for the current persona). Topic descriptions define not just what to include but what to actively exclude (e.g. consumer tech deals for `tech`, primary school stories for `education`). The system prompt identifies the reader role so the LLM can make relevance judgements at the right level.
 
 **Why**: Generic topic descriptions (e.g. "technology, software, startups") produce too many irrelevant articles (consumer gadget deals, gaming, school disaster stories). Explicit exclusion criteria significantly improve signal-to-noise without needing per-feed topic pre-assignment.
+
+## Strategic significance scoring and AI-as-subject rule
+
+**Decision**: The LLM classifier returns a 1–5 significance score alongside topics, and articles below `MIN_SIGNIFICANCE` (default 4) are discarded. The `ai` topic description is written around strategic significance (frontier model releases, breakthroughs, major company moves, policy, large-scale impact; AI in education only when strategic) and requires AI to be the article's primary subject. Incremental updates, individual papers, anecdotes and stories where AI or an AI executive is incidental are explicitly excluded. The reader persona is a senior technology leader in education wanting what peers will be discussing. General-news feeds and the arXiv cs.AI feed are disabled.
+
+**Why**: A topic-match yes/no with "cast a wide net" produced niche and incremental stories, and let through stories that merely involved someone in AI (e.g. espionage targeting a chip company CEO). A score makes selectivity tunable through an env var rather than by rewording prompts. The "classify before fetching" rule is unchanged — the score comes from the same batch call. The keyword fallback has no score and is unaffected.
+
+---
+
+## Clustering inputs, URL pre-dedupe and a separate clustering model
+
+**Decision**: (1) Exact-URL repeats are removed straight after ingestion, before classification. (2) The clustering prompt includes a 200-character RSS summary snippet per article and states that analysis, review or opinion pieces about the same launch or announcement belong in the same group as the news reports. (3) `CLUSTER_MODEL` optionally sets a different model for clustering only. (4) `OPENAI_MODEL` is now actually passed to the classifier and summariser (previously it was read into config but ignored).
+
+**Why**: The same article arriving via two overlapping feeds (e.g. TechCrunch's main and AI feeds) was classified twice, clustered with itself and shown as "multiple sources" with a repeated link. Title-only clustering missed same-story pieces with different framing (a model announcement vs a "looks like a diamond in the rough" review); snippets give shared names and products to match on. Clustering is one call per run, so a stronger model there is cheap. Cluster members' significance scores are merged (max) so the digest can be ordered by importance.
+
+---
 
 ## LLM classification with keyword fallback
 
@@ -80,7 +96,7 @@ Key decisions and the reasoning behind them.
 
 ## Slack digest payload limits
 
-**Decision**: Digests are capped at 20 articles per channel and the payload string is truncated to 7,800 characters. When the cap is exceeded an "… and N more" line is appended; when the character limit is hit a "… truncated" notice is added.
+**Decision**: Digests are capped at 10 articles per channel (ordered by significance score, highest first, so cap and truncation drop the least significant stories) and the payload string is truncated to 7,800 characters. When the cap is exceeded an "… and N more" line is appended; when the character limit is hit a "… truncated" notice is added.
 
 **Why**: Slack Workflow Builder has an undocumented payload size limit (~8,000 chars). Oversized payloads are silently accepted (200 response) but never posted. This caused tech/AI/cyber digests to disappear on high-volume runs while education (fewer articles) still worked. The cap and truncation ensure messages always arrive.
 

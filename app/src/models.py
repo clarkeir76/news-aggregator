@@ -37,6 +37,7 @@ class Article:
     content_hash: Optional[str] = None
     canonical_url: Optional[str] = None
     fetched_at: datetime = field(default_factory=datetime.utcnow)
+    significance: Optional[int] = None  # 1-5 LLM score; None when unscored
 
     def __post_init__(self):
         """Compute content hash if not provided"""
