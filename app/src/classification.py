@@ -28,8 +28,7 @@ TOPICS = {
         "and version updates (OpenAI, Anthropic, Google DeepMind, Meta, xAI, DeepSeek etc.), "
         "genuine AI breakthroughs or groundbreaking real-world uses of AI, major AI company moves "  # noqa: E501
         "(large funding rounds, acquisitions, significant partnerships, leadership changes at AI labs), "  # noqa: E501
-        "AI compute and chip economics, market-moving AI business news (big-tech earnings or "
-        "share-price moves driven by AI, shifts in AI capex, major AI revenue deals), AI regulation and policy that changes what organisations can do, "  # noqa: E501
+        "AI compute and chip economics, AI regulation and policy that changes what organisations can do, "  # noqa: E501
         "significant AI safety incidents, and AI reshaping work or industries at scale. "
         "Also include AI in education ONLY when strategic or groundbreaking: major institutional or "  # noqa: E501
         "government AI policy, large-scale deployments, or significant changes to how people learn "  # noqa: E501
@@ -37,6 +36,10 @@ TOPICS = {
         "The article must be primarily ABOUT AI itself. EXCLUDE stories where AI or an AI company/executive "  # noqa: E501
         "is only incidental (e.g. espionage, lawsuits or scandals involving a person who works in AI, "  # noqa: E501
         "general business or politics that merely mentions AI). "
+        "Prioritise what AI can newly do (breakthroughs, groundbreaking uses, new model capabilities) "  # noqa: E501
+        "over the finances of AI companies. EXCLUDE routine financial-market stories: earnings results, "  # noqa: E501
+        "share-price moves, capex guidance, debt or bond raises, and revenue figures, unless the story "  # noqa: E501
+        "itself changes the AI landscape. "
         "EXCLUDE: incremental feature updates, minor product launches, individual research papers "  # noqa: E501
         "(unless widely covered), tutorials, opinion pieces, listicles, 'AI-powered' marketing, "  # noqa: E501
         "minor startup news, and anecdotal stories (e.g. a student using AI for homework). "
@@ -303,9 +306,10 @@ Rules:
 - Scores must be calibrated harshly: most matching articles should score 2 or 3, and only about
   1 in 20 should score 4 or 5. Score at most 2 for: webinars, event or product promotion,
   vendor tool or product announcements, opinion pieces and explainers, case studies, and
-  partnerships involving non-AI companies. Score 4 for market-moving AI business news, such as
-  big-tech earnings or share-price moves driven by AI, shifts in AI capex, or major AI revenue
-  deals. Reserve 5 for stories like a frontier model release or a major regulatory event
+  partnerships involving non-AI companies. Financial-market stories (earnings, share prices,
+  capex guidance, debt or bond raises, revenue figures) score at most 3 unless the story itself
+  changes the AI landscape. Reserve 4 and 5 for what AI can newly do: frontier model releases,
+  genuine breakthroughs, groundbreaking real-world uses, and major regulatory events
 - Respond with valid JSON only, mapping article number to its topics and significance
 
 Example: {example}

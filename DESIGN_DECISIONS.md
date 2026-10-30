@@ -34,6 +34,8 @@ Key decisions and the reasoning behind them.
 
 A first dry run with only "4 or above" kept 30 stories a day, including webinar promotions and vendor tool announcements, because small models inflate scores. The prompt now calibrates harshly (most matches score 2-3, about 1 in 20 scores 4-5, and webinars, promotion, vendor announcements, opinion, case studies and non-AI partnerships score at most 2), and every kept/dropped decision with its score is logged at INFO so the threshold can be tuned from data.
 
+An attempt to include "market-moving AI business news" (earnings, share prices, capex) at score 4 backfired: the first production digest was three financial-market stories (AWS accelerator revenue, Alphabet's search revenue, Microsoft's $25B debt raise). The reader wants what AI can newly do (model releases, breakthroughs, groundbreaking uses) ahead of the finances of AI companies, so routine financial-market stories are now excluded from the topic and capped at a score of 3 (below the default threshold) unless the story itself changes the AI landscape.
+
 The same dry run showed per-article scores varied between outlets covering the same story (e.g. 5, 5 and 4 for one model launch), and a threshold applied per article dropped the lower-scoring member before it could join its cluster. The threshold is therefore applied after clustering, on the highest score in each cluster (`filter_by_significance`), and `CLASSIFY_MODEL` allows a stronger model for scoring consistency. Classification still happens before content fetching; clustering now runs on all topic-matched articles (roughly 80 titles rather than ~30), which remains a single cheap call.
 
 ---

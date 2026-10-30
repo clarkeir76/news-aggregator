@@ -711,7 +711,28 @@ def test_cluster_snippet_has_no_html(mock_openai):
     assert "<p>" not in prompt
 
 
-def test_ai_topic_includes_market_moving_business_news():
+def test_ai_topic_deprioritises_routine_financial_news():
     from app.src.classification import TOPICS
 
-    assert "market-moving AI business news" in TOPICS["ai"]
+    description = TOPICS["ai"]
+    assert "market-moving" not in description
+    assert "EXCLUDE routine financial-market stories" in description
+    assert "earnings" in description and "debt or bond raises" in description
+
+
+def test_classifier_prompt_caps_financial_stories_at_three(mock_openai):
+    import json
+
+    mock_openai.chat.completions.create.return_value.choices[
+        0
+    ].message.content = json.dumps({"1": {"topics": ["ai"], "significance": 3}})
+    classifier = LLMClassifier(api_key="test-key", enabled_topics=["ai"])
+    classifier.client = mock_openai
+    classifier.classify_and_filter([make_article("New LLM")])
+
+    prompt = mock_openai.chat.completions.create.call_args.kwargs["messages"][1][
+        "content"
+    ]
+    assert "Financial-market stories" in prompt
+    assert "score at most 3" in prompt
+    assert "what AI can newly do" in prompt
